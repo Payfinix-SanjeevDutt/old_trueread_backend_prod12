@@ -602,7 +602,9 @@ def consumers_bulk(request):
             newid.rdng_ocr_status_changed_by == data['rdng_ocr_status_changed_by'] and
             newid.prsnt_rdng_ocr_odv == data['prsnt_rdng_ocr_odv'] and
             newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
-            newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values']
+            newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values'] and
+            newid.kvah_rdng == data['kvah_rdng'] and
+            newid.kvah_img == data['kvah_img']
         ):
                     print("updatation does not takes place")
                     # return Response({"status": True, "message": "No change in Data"})
@@ -6641,12 +6643,17 @@ def newmonthdataa(request):
                + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) AS diff,
                SUM(CASE WHEN rdng_ocr_status = 'Failed' and qc_rmrk='MR Fault' THEN 1 ELSE 0 END) AS mrFault,
                SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' THEN 1 ELSE 0 END) AS imageBlur,
-SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Incorrect Reading' THEN 1 ELSE 0 END) AS incorrectReading,
-SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Meter Dirty' THEN 1 ELSE 0 END) AS meterDirty,
-SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found' THEN 1 ELSE 0 END) AS noExcepFound,
-SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image' THEN 1 ELSE 0 END) AS spoofedImage,
-SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid' THEN 1 ELSE 0 END) AS invalidImage,
-SUM(CASE WHEN rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '' THEN 1 ELSE 0 END) AS blanks
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Incorrect Reading' THEN 1 ELSE 0 END) AS incorrectReading,
+            SUM(CASE 
+        WHEN prsnt_rdng_ocr_excep = 'Meter Dirty' 
+             OR (rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '') 
+        THEN 1 
+        ELSE 0 
+    END) AS meterDirty,
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found' THEN 1 ELSE 0 END) AS noExcepFound,
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image' THEN 1 ELSE 0 END) AS spoofedImage,
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid' THEN 1 ELSE 0 END) AS invalidImage
+            
         FROM {tablename} r
         {clause}
         GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name;
@@ -6698,7 +6705,7 @@ SUM(CASE WHEN rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '' THEN 1 EL
             newdict["noExcepFound"] = row[18]
             newdict["spoofedImage"] = row[19]
             newdict["invalidImage"] = row[20]
-            newdict["blanks"] = row[21]
+            # newdict["blanks"] = row[21]
 
             # Add to list
             newdata = listfun(newdict)
