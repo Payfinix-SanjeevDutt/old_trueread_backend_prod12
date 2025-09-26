@@ -442,10 +442,10 @@ def consumers_bulk(request):
         
         # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
         try:
-            if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image"]:
-                lambda_url = "https://6la2alj6zhhledhnwhp4ybhs2y0rzlhr.lambda-url.us-east-2.on.aws/"
+            if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
+                lambda_url = "https://meternometer.true-read.com"
                 payload = {"url": data.get("rdng_img")}
-                resp = requests.post(lambda_url, json=payload, timeout=10)
+                resp = requests.post(lambda_url, json=payload, timeout=30)
                 if resp.status_code == 200:
                     lambda_result = resp.json().get("result")
                     if lambda_result == "No":  # meter not present
@@ -456,9 +456,6 @@ def consumers_bulk(request):
             # data["prsnt_rdng_ocr_excep"] = data.get("prsnt_rdng_ocr_excep", "")
 
        
-        # NEW LOGIC : IF OCR READING IS NOT FOUND SET IMAGE BLUR
-        if data.get("prsnt_ocr_rdng") == "Not Found":
-           data["prsnt_rdng_ocr_excep"] = "Image blur"
            
         char = 0
         ba_bl_id = data["ba_bl_id"]
