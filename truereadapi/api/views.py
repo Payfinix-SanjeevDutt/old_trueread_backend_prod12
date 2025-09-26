@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from rest_framework.response import Response
+import requests
 from rest_framework.decorators import api_view, permission_classes
 from .models import Consumers, MeterReaderRegistration, Office, UserManagement
 from .serializers import (
@@ -438,11 +439,27 @@ def consumers_bulk(request):
         # comment this line
         data["reading_date_db"] = reading_date_db
         data["bill_month_dt"] = bill_month_add
+        
+        # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
+        try:
+            if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image"]:
+                lambda_url = "https://6la2alj6zhhledhnwhp4ybhs2y0rzlhr.lambda-url.us-east-2.on.aws/"
+                payload = {"url": data.get("rdng_img")}
+                resp = requests.post(lambda_url, json=payload, timeout=10)
+                if resp.status_code == 200:
+                    lambda_result = resp.json().get("result")
+                    if lambda_result == "No":  # meter not present
+                        data["prsnt_rdng_ocr_excep"] = "Invalid"
+        except Exception as e:
+            print("Lambda call failed:", str(e))
+            # fail-safe: keep original value
+            # data["prsnt_rdng_ocr_excep"] = data.get("prsnt_rdng_ocr_excep", "")
 
+       
         # NEW LOGIC : IF OCR READING IS NOT FOUND SET IMAGE BLUR
         if data.get("prsnt_ocr_rdng") == "Not Found":
            data["prsnt_rdng_ocr_excep"] = "Image blur"
-
+           
         char = 0
         ba_bl_id = data["ba_bl_id"]
         try:
@@ -6202,7 +6219,7 @@ def newmvcheck(request):
 
     # Base SELECT
     query = f"""
-        SELECT m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng, 
+        SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng, 
                m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading, 
                m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status, 
                m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto", 
