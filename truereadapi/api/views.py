@@ -440,20 +440,21 @@ def consumers_bulk(request):
         data["reading_date_db"] = reading_date_db
         data["bill_month_dt"] = bill_month_add
         
+        
+        
         # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
-        try:
-            if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
-                lambda_url = "https://meternometer.true-read.com"
-                payload = {"url": data.get("rdng_img")}
-                resp = requests.post(lambda_url, json=payload, timeout=30)
-                if resp.status_code == 200:
-                    lambda_result = resp.json().get("result")
-                    if lambda_result == "No":  # meter not present
-                        data["prsnt_rdng_ocr_excep"] = "Invalid"
-        except Exception as e:
-            print("Lambda call failed:", str(e))
-            # fail-safe: keep original value
-            # data["prsnt_rdng_ocr_excep"] = data.get("prsnt_rdng_ocr_excep", "")
+        # try:
+        #     if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
+        #         lambda_url = "https://meternometer.true-read.com"
+        #         payload = {"url": data.get("rdng_img")}
+        #         resp = requests.post(lambda_url, json=payload, timeout=30)
+        #         if resp.status_code == 200:
+        #             lambda_result = resp.json().get("result")
+        #             if lambda_result == "No":  # meter not present
+        #                 data["prsnt_rdng_ocr_excep"] = "Invalid"
+        # except Exception as e:
+        #     print("Lambda call failed:", str(e))
+
 
        
            
