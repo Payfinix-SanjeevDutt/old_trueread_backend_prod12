@@ -457,9 +457,40 @@ def consumers_bulk(request):
 
 
        
-           
+          
         char = 0
         ba_bl_id = data["ba_bl_id"]
+        
+        rdngImg = data.get("rdng_img")
+ 
+        # Ensure rdngImg is a clean string (not list or nested)
+        if isinstance(rdngImg, list):
+            rdngImg = rdngImg[0]
+        elif isinstance(rdngImg, dict) and "url" in rdngImg:
+            rdngImg = rdngImg["url"]
+        elif not isinstance(rdngImg, str):
+            rdngImg = str(rdngImg)
+ 
+        # strip extra quotes or spaces
+        rdngImg = rdngImg.strip('"').strip()
+        
+        try:
+            if data.get("rdng_ocr_status") in ["Failed"]:
+                lambda_url = "https://biharqc.true-read.com"
+                # lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
+                payload = {"image_url": rdngImg}
+                response = requests.post(lambda_url, json=payload, timeout=60)
+                if response.status_code == 200:
+                    lambda_result = response.json().get("result")
+                    # if lambda_result == "Passed":  # meter not present
+                    data["rdng_ocr_status"] = lambda_result
+                    if lambda_result == 'Passed': 
+                        data["qc_done"] = 'byLambda'
+                
+                       
+        except Exception as e:
+            print("Lambda call failed:", str(e))
+        
         try:
             if data["prsnt_mtr_status"] == "Ok":
                 if data["prsnt_ocr_rdng"] != "Not Found":
@@ -8505,87 +8536,87 @@ def divisiondata(request):
 #     })
 
 
+# -------------------------------QC IMG-----------------------------------------------------------------
+# @api_view(['POST', 'GET'])
+# def failedimages(request):
+#     month = request.data.get("month", None)
+#     zone = request.data.get("zone", None)
+#     division = request.data.get("division", None)
+#     pagesize = request.data.get("pagesize", None)
+#     ocrrdng = request.data.get("ocrrdng", None)
+#     page = request.data.get("page",)
+#     user = request.data.get("user", None)
 
-@api_view(['POST', 'GET'])
-def failedimages(request):
-    month = request.data.get("month", None)
-    zone = request.data.get("zone", None)
-    division = request.data.get("division", None)
-    pagesize = request.data.get("pagesize", None)
-    ocrrdng = request.data.get("ocrrdng", None)
-    page = request.data.get("page",)
-    user = request.data.get("user", None)
+#     now = datetime.now()
+#     offset = (int(pagesize) * int(page))-int(pagesize)
+#     clause = ''
 
-    now = datetime.now()
-    offset = (int(pagesize) * int(page))-int(pagesize)
-    clause = ''
+#     where_clauses = []
+#     if month:
+#         month = month.split('-')[1]
+#         where_clauses.append(f"EXTRACT(MONTH FROM reading_date_db)='{month}'")
+#     else:
+#         current_month = now.month
+#         where_clauses.append(
+#             f"EXTRACT(MONTH FROM reading_date_db) = '{current_month}'")
+#     if zone:
+#         where_clauses.append(f"ofc_zone = '{zone}'")
 
-    where_clauses = []
-    if month:
-        month = month.split('-')[1]
-        where_clauses.append(f"EXTRACT(MONTH FROM reading_date_db)='{month}'")
-    else:
-        current_month = now.month
-        where_clauses.append(
-            f"EXTRACT(MONTH FROM reading_date_db) = '{current_month}'")
-    if zone:
-        where_clauses.append(f"ofc_zone = '{zone}'")
+#     if division:
+#         where_clauses.append(f"ofc_division = '{division}'")
 
-    if division:
-        where_clauses.append(f"ofc_division = '{division}'")
+#     if ocrrdng:
+#         where_clauses.append(f"prsnt_ocr_rdng = '{ocrrdng}'")
+#     else:
+#         where_clauses.append("prsnt_ocr_rdng != 'Not Found'")
+#     if where_clauses:
+#         clause = ' AND '.join(where_clauses)
 
-    if ocrrdng:
-        where_clauses.append(f"prsnt_ocr_rdng = '{ocrrdng}'")
-    else:
-        where_clauses.append("prsnt_ocr_rdng != 'Not Found'")
-    if where_clauses:
-        clause = ' AND '.join(where_clauses)
+#     cursor = connection.cursor()
+#     cursor1 = connection.cursor()
+#     cursor2 = connection.cursor()
 
-    cursor = connection.cursor()
-    cursor1 = connection.cursor()
-    cursor2 = connection.cursor()
+#     query = (
+#         f'''select id,rdng_img,prsnt_rdng,prsnt_ocr_rdng from readingmaster where rdng_ocr_status = 'Failed' and qc_req='Yes' and prsnt_rdng_ocr_excep != 'Spoofed Image' and mtr_excep_img isnull and manual_update_flag isnull and {clause} limit {pagesize} offset {offset} ''')
+#     query1 = (
+#         f'''SELECT COUNT(*) AS tot_count FROM readingmaster WHERE rdng_ocr_status = 'Failed' and prsnt_rdng_ocr_excep != 'Spoofed Image' AND qc_req = 'Yes' and mtr_excep_img isnull and manual_update_flag isnull AND {clause} ''')
+#     query2 = (
+#         f'''
+#         select count(*) as updated_count from readingmaster
+#       where mtr_excep_img = 'vapp_{user}' AND EXTRACT(MONTH FROM reading_date_db)='{month}' AND ofc_zone = '{zone}' AND ofc_division = '{division}'
+#         '''
+#     )
 
-    query = (
-        f'''select id,rdng_img,prsnt_rdng,prsnt_ocr_rdng from readingmaster where rdng_ocr_status = 'Failed' and qc_req='Yes' and prsnt_rdng_ocr_excep != 'Spoofed Image' and mtr_excep_img isnull and manual_update_flag isnull and {clause} limit {pagesize} offset {offset} ''')
-    query1 = (
-        f'''SELECT COUNT(*) AS tot_count FROM readingmaster WHERE rdng_ocr_status = 'Failed' and prsnt_rdng_ocr_excep != 'Spoofed Image' AND qc_req = 'Yes' and mtr_excep_img isnull and manual_update_flag isnull AND {clause} ''')
-    query2 = (
-        f'''
-        select count(*) as updated_count from readingmaster
-      where mtr_excep_img = 'vapp_{user}' AND EXTRACT(MONTH FROM reading_date_db)='{month}' AND ofc_zone = '{zone}' AND ofc_division = '{division}'
-        '''
-    )
+#     print("query",query)
+#     print("query1",query1)
+#     print("query2",query2)
 
-    print("query",query)
-    print("query1",query1)
-    print("query2",query2)
+#     cursor.execute(query)
+#     cursor1.execute(query1)
+#     cursor2.execute(query2)
 
-    cursor.execute(query)
-    cursor1.execute(query1)
-    cursor2.execute(query2)
+#     person_objects = dictfetchall(cursor)
+#     data = dictfetchall(cursor1)
+#     data1 = dictfetchall(cursor2)
+#     count = data[0]['tot_count']
+#     count1 = data1[0]['updated_count']
 
-    person_objects = dictfetchall(cursor)
-    data = dictfetchall(cursor1)
-    data1 = dictfetchall(cursor2)
-    count = data[0]['tot_count']
-    count1 = data1[0]['updated_count']
+#     if not person_objects:
+#         return Response({
+#             "status": False,
+#             "message": "Data not found",
+#             "count": count,
+#             "update_count": count1,
+#             "results": person_objects,
+#         })
 
-    if not person_objects:
-        return Response({
-            "status": False,
-            "message": "Data not found",
-            "count": count,
-            "update_count": count1,
-            "results": person_objects,
-        })
-
-    return Response({
-        "status": True,
-        "message": "Data Fetched Successfully",
-        "count": count,
-        "update_count": count1,
-        "results": person_objects,
-    })
+#     return Response({
+#         "status": True,
+#         "message": "Data Fetched Successfully",
+#         "count": count,
+#         "update_count": count1,
+#         "results": person_objects,
+#     })
 
 
 
@@ -9066,72 +9097,72 @@ def search_by_mr(request):
         "results": person_objects,
     })
 
+# ------------------------- QC IMAGES -------------------------------------------------------
+# @api_view(['POST', 'GET'])
+# def mr_failed_images(request):
+#     monthyear = request.data.get("month")
+#     pagesize = request.data.get("pagesize")
+#     ocrrdng = request.data.get("ocrrdng")
+#     page = request.data.get("page")
+#     user = request.data.get("user")
+#     mrid = request.data.get('mrid', None)
+#     print(monthyear, ocrrdng, user, mrid)
+#     month = int(monthyear.split('-')[1])
+#     year = int(monthyear.split('-')[0])
+#     now = datetime.now()
 
-@api_view(['POST', 'GET'])
-def mr_failed_images(request):
-    monthyear = request.data.get("month")
-    pagesize = request.data.get("pagesize")
-    ocrrdng = request.data.get("ocrrdng")
-    page = request.data.get("page")
-    user = request.data.get("user")
-    mrid = request.data.get('mrid', None)
-    print(monthyear, ocrrdng, user, mrid)
-    month = int(monthyear.split('-')[1])
-    year = int(monthyear.split('-')[0])
-    now = datetime.now()
+#     q_objects = Q(rdng_ocr_status='Failed', mtr_excep_img__isnull=True, manual_update_flag__isnull=True) & ~(
+#         Q(prsnt_rdng_ocr_excep='Spoofed Image') & Q(is_object_meter='NO and camera blocked'))
+#     if month:
+#         q_objects &= Q(reading_date_db__month=month)
+#     else:
+#         q_objects &= Q(reading_date_db__month=now.month)
+#     if year:
+#         q_objects &= Q(reading_date_db__year=year)
+#     else:
+#         q_objects &= Q(reading_date_db__year=now.year)
+#     if mrid:
+#         q_objects &= Q(mr_id=mrid)
+#     if ocrrdng:
+#         q_objects &= Q(prsnt_ocr_rdng=ocrrdng)
+#     else:
+#         q_objects &= ~Q(prsnt_ocr_rdng='Not Found')
 
-    q_objects = Q(rdng_ocr_status='Failed', mtr_excep_img__isnull=True, manual_update_flag__isnull=True) & ~(
-        Q(prsnt_rdng_ocr_excep='Spoofed Image') & Q(is_object_meter='NO and camera blocked'))
-    if month:
-        q_objects &= Q(reading_date_db__month=month)
-    else:
-        q_objects &= Q(reading_date_db__month=now.month)
-    if year:
-        q_objects &= Q(reading_date_db__year=year)
-    else:
-        q_objects &= Q(reading_date_db__year=now.year)
-    if mrid:
-        q_objects &= Q(mr_id=mrid)
-    if ocrrdng:
-        q_objects &= Q(prsnt_ocr_rdng=ocrrdng)
-    else:
-        q_objects &= ~Q(prsnt_ocr_rdng='Not Found')
+#     reading_master_objects = Consumers.objects.filter(q_objects).order_by('id')
 
-    reading_master_objects = Consumers.objects.filter(q_objects).order_by('id')
+#     paginator = Paginator(reading_master_objects, pagesize)
+#     try:
+#         paginated_results = paginator.page(page)
+#     except Exception:
+#         paginated_results = paginator.page(1)
 
-    paginator = Paginator(reading_master_objects, pagesize)
-    try:
-        paginated_results = paginator.page(page)
-    except Exception:
-        paginated_results = paginator.page(1)
+#     count = reading_master_objects.count()
 
-    count = reading_master_objects.count()
+#     updated_count = Consumers.objects.filter(
+#         mtr_excep_img=f'vapp_{user}',
+#         reading_date_db__month=month,
+#         reading_date_db__year=year,
+#         mr_id=mrid
+#     ).count()
 
-    updated_count = Consumers.objects.filter(
-        mtr_excep_img=f'vapp_{user}',
-        reading_date_db__month=month,
-        reading_date_db__year=year,
-        mr_id=mrid
-    ).count()
+#     serializer = FailedImageSerializer(paginated_results, many=True)
 
-    serializer = FailedImageSerializer(paginated_results, many=True)
+#     if not serializer.data:
+#         return Response({
+#             "status": False,
+#             "message": "Data not found",
+#             "count": count,
+#             "update_count": updated_count,
+#             "results": serializer.data,
+#         })
 
-    if not serializer.data:
-        return Response({
-            "status": False,
-            "message": "Data not found",
-            "count": count,
-            "update_count": updated_count,
-            "results": serializer.data,
-        })
-
-    return Response({
-        "status": True,
-        "message": "Data Fetched Successfully",
-        "count": count,
-        "update_count": updated_count,
-        "results": serializer.data,
-    })
+#     return Response({
+#         "status": True,
+#         "message": "Data Fetched Successfully",
+#         "count": count,
+#         "update_count": updated_count,
+#         "results": serializer.data,
+#     })
 
 
 @api_view(['POST'])
