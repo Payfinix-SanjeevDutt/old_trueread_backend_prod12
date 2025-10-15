@@ -6202,6 +6202,7 @@ def newmvcheck(request):
     page = request.data.get("page", 1)
     orderby = request.data.get("orderby", "DESC")
     filters = request.data.get("filters", {})
+    print("filters...",filters)
     export_all = request.data.get("export_all", False)  # NEW FLAG
 
     offset = (int(pagesize) * int(page)) - int(pagesize) if pagesize else 0
@@ -6233,8 +6234,8 @@ def newmvcheck(request):
                 clause_parts.append("m.rdng_ocr_status = 'Passed'")
             elif value == "OCR with Exception":
                 exception_detail = filters.get("prsnt_rdng_ocr_excep")
+                clause_parts.append("m.rdng_ocr_status = 'Failed'")
                 if exception_detail:
-                    clause_parts.append("m.rdng_ocr_status = 'Failed'")
                     clause_parts.append(f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
         elif key == "bl_agnc_name":
             clause_parts.append(f"bl_agnc_name = '{value}'")
