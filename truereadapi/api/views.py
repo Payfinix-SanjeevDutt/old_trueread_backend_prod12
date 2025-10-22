@@ -21,6 +21,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import connection
 import json
 import jwt
+import requests
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -409,27 +410,41 @@ def consumers(request):
 @api_view(["POST"])
 def consumers_bulk(request):
     data_list = request.data.copy()
-    print("datalist--->",data_list)
+    print("datalist---Ibsar>",data_list)
     count_insert=0
     count_update=0
     failed_consumers=[]
+    
     for data in data_list:
-
+ 
         rdng_date = data["rdng_date"]
         cons_name = data["cons_name"]
         cons_ac_no = data["cons_ac_no"]
         ofc_section=data['ofc_section']
-        
-        
+        rdngImg = data.get("rdng_img")
+
+        # Ensure rdngImg is a clean string (not list or nested)
+        if isinstance(rdngImg, list):
+            rdngImg = rdngImg[0]
+        elif isinstance(rdngImg, dict) and "url" in rdngImg:
+            rdngImg = rdngImg["url"]
+        elif not isinstance(rdngImg, str):
+            rdngImg = str(rdngImg)
+
+        # strip extra quotes or spaces
+        rdngImg = rdngImg.strip('"').strip()
+
+       
+       
         if cons_name == "Test":
             return Response({"status": True, "message": "Test data not inserted"})
-
-
+ 
+ 
         reading_date_db = rdng_date[:10]
         adddate = "-01"
         bill_month_add = reading_date_db[:7] + adddate
         print(bill_month_add)
-
+ 
         reading_year = reading_date_db[:4]
         reading_month = reading_date_db[5:7]
         print(reading_date_db)
@@ -438,11 +453,47 @@ def consumers_bulk(request):
         # comment this line
         data["reading_date_db"] = reading_date_db
         data["bill_month_dt"] = bill_month_add
-
+       
+        # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
+        # try:
+        #     if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
+        #         # lambda_url = "https://6la2alj6zhhledhnwhp4ybhs2y0rzlhr.lambda-url.us-east-2.on.aws/"
+        #         lambda_url = "https://meternometer.true-read.com"
+        #         payload = {"url": data.get("rdng_img")}
+        #         resp = requests.post(lambda_url, json=payload, timeout=30)
+        #         print(resp)
+        #         if resp.status_code == 200:
+        #             lambda_result = resp.json().get("result")
+        #             if lambda_result == "No":  # meter not present
+        #                 data["prsnt_rdng_ocr_excep"] = "Invalid"
+        #                 print(lambda_result)
+                        
+        # except Exception as e:
+        #     print("Lambda call failed:", str(e))
+            # fail-safe: keep original value
+            # data["prsnt_rdng_ocr_excep"] = data.get("prsnt_rdng_ocr_excep", "")
+ 
+       
         # NEW LOGIC : IF OCR READING IS NOT FOUND SET IMAGE BLUR
-        if data.get("prsnt_ocr_rdng") == "Not Found":
-           data["prsnt_rdng_ocr_excep"] = "Image blur"
-
+        # if data.get("prsnt_ocr_rdng") == "Not Found":
+        #    data["prsnt_rdng_ocr_excep"] = "Image blur"
+        
+        # Failed Images logics 
+        try:
+            if data.get("rdng_ocr_status") in ["Failed"]:
+                lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
+                payload = {"image_url": rdngImg}
+                response = requests.post(lambda_url, json=payload, timeout=60)
+                if response.status_code == 200:
+                    lambda_result = response.json().get("result")
+                    # if lambda_result == "Passed":  # meter not present
+                    data["rdng_ocr_status"] = lambda_result
+                    data["qc_done"] = 'byLambda'
+                    print("hit lambda result",lambda_result)
+                        
+        except Exception as e:
+            print("Lambda call failed:", str(e))
+           
         char = 0
         ba_bl_id = data["ba_bl_id"]
         try:
@@ -459,7 +510,7 @@ def consumers_bulk(request):
                     flag = False
                     if (prsnt_ocr_rdng_temp) == (prsnt_rdng_temp):
                         status = "Exact"
-
+ 
                     elif (len(prsnt_ocr_rdng_temp) - len(prsnt_rdng_temp)) in (-1, 1):
                         for x in range(len(str(temp))):
                             temp_t = str(temp)
@@ -476,19 +527,19 @@ def consumers_bulk(request):
                             u, v = prsnt_ocr_rdng_temp, prsnt_rdng_temp
                             if u[x] != v[x]:
                                 char += 1
-
+ 
                         if char == 1:
                             status = "1_val_diff"
                         else:
                             status = "diff"
-
+ 
                     else:
                         print("OOKOOKOKOKOKOK")
                         if (str(temp1) in str(temp)) and (len(str(temp1)) > 1):
                             status = "subs"
                         else:
                             status = "diff"
-
+ 
                     if status == "1_val_diff" or status == "1_val_miss" or status == "subs":
                         print("INSIDE UPDATESSSSS")
                         data["prsnt_rdng_ocr_odv"] = data["prsnt_ocr_rdng"]
@@ -502,15 +553,15 @@ def consumers_bulk(request):
         except:
             pass
         try:
-            if data["prsnt_mtr_status"] == "Ok" and data["rdng_ocr_status"] == "":
+            if data["prsnt_mtr_status"] == "Ok" and data["rdng_ocr_status"] == "" :
                 data["rdng_ocr_status"] = "Failed"
                 data["manual_update_flag"] = "true"
                 data["rdng_ocr_status_changed_by"] = "Backend_RERUN"
         except:
             pass
-
+ 
         # if bill id is present check the consumer ac no and month
-
+ 
         try:
             newid = (
                 Consumers.objects.filter(
@@ -519,8 +570,8 @@ def consumers_bulk(request):
                 .order_by("-id")
                 .first()
             )
-
-
+ 
+ 
             print("newid", newid)
             if newid is not None:
             # Check all the columns only then update
@@ -610,26 +661,26 @@ def consumers_bulk(request):
                     # return Response({"status": True, "message": "No change in Data"})
                 else:
                     print("updating as some of the values are changed")
-                
+               
                     serializer = ConsumerSerializer(newid, data=data, partial=True)
                     if serializer.is_valid():
                         serializer.save()
                         count_update+=1
-        
-                    
+       
+                   
             # if bill id is not present then insert
-
+ 
             else:
                 print("inserted")
                 serializer = ConsumerSerializer(data=data)
                 if serializer.is_valid():
                     serializer.save()
                     count_insert+=1
-
+ 
         except Exception as e:
             failedCons={"message":str(e),"cons_ac_no":data['cons_ac_no']}
             failed_consumers.append(failedCons)
-            
+           
     print({"status": True, "message": f"Data inserted {count_insert} and Data updated {count_update}", "version": "28"})
     if len(failed_consumers)>0:
         return Response(
@@ -6187,8 +6238,8 @@ def newmvcheck(request):
                 clause_parts.append("m.rdng_ocr_status = 'Passed'")
             elif value == "OCR with Exception":
                 exception_detail = filters.get("prsnt_rdng_ocr_excep")
+                clause_parts.append("m.rdng_ocr_status = 'Failed'")
                 if exception_detail:
-                    clause_parts.append("m.rdng_ocr_status = 'Failed'")
                     clause_parts.append(f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
         elif key == "bl_agnc_name":
             clause_parts.append(f"bl_agnc_name = '{value}'")
