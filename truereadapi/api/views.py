@@ -474,22 +474,22 @@ def consumers_bulk(request):
         # strip extra quotes or spaces
         rdngImg = rdngImg.strip('"').strip()
         
-        try:
-            if data.get("rdng_ocr_status") in ["Failed"]:
-                lambda_url = "https://biharqc.true-read.com"
-                # lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
-                payload = {"image_url": rdngImg}
-                response = requests.post(lambda_url, json=payload, timeout=60)
-                if response.status_code == 200:
-                    lambda_result = response.json().get("result")
-                    # if lambda_result == "Passed":  # meter not present
-                    data["rdng_ocr_status"] = lambda_result
-                    if lambda_result == 'Passed': 
-                        data["qc_done"] = 'byLambda'
+        # try:
+        #     if data.get("rdng_ocr_status") in ["Failed"]:
+        #         lambda_url = "https://biharqc.true-read.com"
+        #         # lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
+        #         payload = {"image_url": rdngImg}
+        #         response = requests.post(lambda_url, json=payload, timeout=60)
+        #         if response.status_code == 200:
+        #             lambda_result = response.json().get("result")
+        #             # if lambda_result == "Passed":  # meter not present
+        #             data["rdng_ocr_status"] = lambda_result
+        #             if lambda_result == 'Passed': 
+        #                 data["qc_done"] = 'byLambda'
                 
                        
-        except Exception as e:
-            print("Lambda call failed:", str(e))
+        # except Exception as e:
+        #     print("Lambda call failed:", str(e))
         
         try:
             if data["prsnt_mtr_status"] == "Ok":
@@ -8045,7 +8045,7 @@ def cons_wise_details_with_search(request):
     m.id,m.cons_name,m.cons_ac_no,cons_address,m.cons_ph_no,m.con_trf_cat,m.mr_unit,
     r."mrId",r."mrName",r."mrPhone",r."mrPhoto" as avatar,m.con_mtr_sl_no,
     m.rdng_date,m.prsnt_mtr_status,m.prsnt_md_rdng,m.ocr_pf_reading,m.abnormality,m.prsnt_rdng_ocr_excep,m.md_ocr_excep,m.mr_rmrk,m.qc_req,m.ai_mdl_ver,m.ph_name,m.cmra_res,m.andr_ver,m.reading_date_db,
-    m.rdng_img,m.md_img,m.pf_image,m.prsnt_ocr_rdng,m.prsnt_rdng,m.prsnt_md_rdng_ocr,m.rdng_ocr_status
+    m.rdng_img,m.md_img,m.pf_image,m.prsnt_ocr_rdng,m.prsnt_rdng,m.prsnt_md_rdng_ocr,m.rdng_ocr_status,m.kvah_rdng,m.kvah_img 
       FROM
     readingmaster m left outer join meterreaderregistration r on m.mr_id=r."mrId" {clause}"""
     else:
