@@ -198,6 +198,8 @@ urlpatterns=[
     path('reconsilation/', views.reconsilation, name='reconsilation'),
     path('deletereconsilation/', views.deletereconsilation, name='deletereconsiliation'),
     path('uploadxlsx/', views.uploadxlsx, name='uploadxlsx'),
+    path('qcStatusChange/', views.process_failed_meter_readings, name='qcstatuschange'),
+    # path('updateLambdaresults/', views.update_lambda_results_to_db, name= 'updateLambdaresults')
 
     
 
