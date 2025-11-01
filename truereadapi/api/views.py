@@ -413,6 +413,9 @@ def consumers_bulk(request):
     count_update = 0
     failed_consumers = []
     for data in data_list:
+        # ensure defaults for new keys
+        data['kvah_manual'] = data.get('kvah_manual', None)
+        data['kvah_Status'] = data.get('kvah_Status', None)
 
         rdng_date = data["rdng_date"]
         cons_name = data["cons_name"]
@@ -641,7 +644,9 @@ def consumers_bulk(request):
                     newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
                     newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values'] and
                     newid.kvah_rdng == data['kvah_rdng'] and
-                    newid.kvah_img == data['kvah_img']
+                    newid.kvah_img == data['kvah_img'] and
+                    newid.kvah_manual == data['kvah_manual'] and
+                    newid.kvah_Status == data['kvah_Status']
                 ):
                     print("updatation does not takes place")
                     # return Response({"status": True, "message": "No change in Data"})
@@ -6252,8 +6257,12 @@ def newmvcheck(request):
                     clause_parts.append(f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
         elif key == "bl_agnc_name":
             clause_parts.append(f"bl_agnc_name = '{value}'")
+        # elif key == "ofc_discom":
+        #     clause_parts.append(f"ofc_discom = '{value}'")
         elif key == "ofc_discom":
-            clause_parts.append(f"ofc_discom = '{value}'")
+            if value and value.upper() != "ALL":
+                clause_parts.append(f"ofc_discom = '{value}'")
+
  
     clause = " AND ".join(clause_parts)
     clause = f" AND {clause}" if clause else ""
