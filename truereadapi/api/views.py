@@ -6279,7 +6279,7 @@ def newmvcheck(request):
         FROM {tablename} m
         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
-               OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
+               OR m.rdng_ocr_status_changed_by ILIKE '%vapp%' OR m.qc_done != 'byLambda')
         AND m.rdng_img != '' {clause}
         ORDER BY m.rdng_date {orderby}
     """
