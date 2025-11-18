@@ -7188,33 +7188,21 @@ def qccheckmobile(request):
     data = UserManagement.objects.filter(email=request.data["email"])
     serializer = UserManagementSerializer(data, many=True)
     my_dict = serializer.data[0]
+ 
     ofc_zone = my_dict["ofc_zone"]
     ofc_circle = my_dict["ofc_circle"]
     ofc_division = my_dict["ofc_division"]
+ 
     start_date = request.data.get("start_date")
     end_date = request.data.get("end_date")
+ 
     cursor = connection.cursor()
+ 
     query = f"""
-    SELECT
-        COUNT(r.id) AS totalreadings,
-        COUNT(CASE WHEN r.rdng_ocr_status='Passed' THEN 1 END) AS totalpassed,
-        COUNT(CASE WHEN r.rdng_ocr_status='Failed' THEN 1 END) AS totalfailed
-    FROM readingmaster r
-    WHERE
-        r.prsnt_mtr_status='Ok'
-        AND r.ofc_zone = '{ofc_zone}'
-        AND r.ofc_circle = '{ofc_circle}'
-        AND r.ofc_division = '{ofc_division}'
-        AND r.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
-    """
-
-    cursor.execute(query)
-    person_objects1 = dictfetchall(cursor)
-    print("Query:>>", query)
-
-    query1 = f"""SELECT r.id AS id,r.cons_name AS consumername,r.cons_ac_no AS consumeraccno,r.con_mtr_sl_no AS consumermeterslno,r.qc_meter_status AS qcmeterstatus,r.qc_ocr_status AS qcocrstatus,
-            r.prsnt_rdng AS prsntrdng,r.prsnt_ocr_rdng AS prsntocrrdng,r.rdng_ocr_status AS rdngocrstatus,r.rdng_img AS rdngimg,r.prsnt_mtr_status AS prsntmtrstatus,
-            r.abnormality AS abnormality
+        SELECT
+            COUNT(r.id) AS totalreadings,
+            COUNT(CASE WHEN r.rdng_ocr_status='Passed' THEN 1 END) AS totalpassed,
+            COUNT(CASE WHEN r.rdng_ocr_status='Failed' THEN 1 END) AS totalfailed
         FROM readingmaster r
         WHERE
             r.prsnt_mtr_status='Ok'
@@ -7222,22 +7210,38 @@ def qccheckmobile(request):
             AND r.ofc_circle = '{ofc_circle}'
             AND r.ofc_division = '{ofc_division}'
             AND r.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
-        ORDER BY r.id DESC
-        LIMIT 1
     """
-
-    cursor.execute(query1)
-    person_objects = dictfetchall(cursor)
-
-    # Handle empty results
-    if not person_objects:
-        return Response({"error": "No readings found for this date range"}, status=404)
-
+    cursor.execute(query)
+ 
+    print("query:DataBasedon date range-->",query)
+    person_objects1 = dictfetchall(cursor)
+ 
+    query2 = f"""
+        SELECT
+            COUNT(r.id) AS todaystotalreadings,
+            COUNT(CASE WHEN r.rdng_ocr_status='Passed' THEN 1 END) AS todayspassed,
+            COUNT(CASE WHEN r.rdng_ocr_status='Failed' THEN 1 END) AS todaysfailed
+        FROM readingmaster r
+        WHERE
+            r.prsnt_mtr_status='Ok'
+            AND r.ofc_zone = '{ofc_zone}'
+            AND r.ofc_circle = '{ofc_circle}'
+            AND r.ofc_division = '{ofc_division}'
+            AND r.reading_date_db = CURRENT_DATE
+    """
+ 
+    cursor.execute(query2)
+    today_data = dictfetchall(cursor)
+    print("query:TodaysData-->",query2)
+ 
     if not person_objects1:
         return Response({"error": "No summary data found"}, status=404)
-
-    res = {**person_objects[0], **person_objects1[0]}
-    return Response(res)
+ 
+    response = {
+    **person_objects1[0],  # Total summary for date range
+    **today_data[0]        # Today's total/passed/failed
+    }
+    return Response(response)
 
 
 
