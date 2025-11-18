@@ -141,6 +141,7 @@ urlpatterns=[
     
     path('qccheckmobile/',views.qccheckmobile,name='qccheckmobile'),
     path('qcmobiledashboard/',views.qcmobiledashboard,name='qcmobiledashboard'),
+    path('androidclusterstestnew/',views.androidclusterstestnew,name='androidclusterstestnew'),
     path('downloadexcel/',views.downloadexcel,name='downloadexcel'),
     path('mobilemvcards/',views.mobilemvcards,name='mobilemvcards'),
     path('get_officedata/',views.get_officedata,name='get_officedata'),
