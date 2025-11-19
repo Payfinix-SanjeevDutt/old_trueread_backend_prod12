@@ -199,6 +199,7 @@ urlpatterns=[
     path('reconsilation/', views.reconsilation, name='reconsilation'),
     path('deletereconsilation/', views.deletereconsilation, name='deletereconsiliation'),
     path('uploadxlsx/', views.uploadxlsx, name='uploadxlsx'),
+    path('supervisorlogin/', views.supervisorlogin, name='supervisorlogin'),
 
     
 

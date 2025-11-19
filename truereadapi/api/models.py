@@ -281,3 +281,22 @@ class notificatio_recepients(models.Model):
         db_table='notification_recepients'        
         
         
+from django.db import models
+
+class SupervisorLogin(models.Model):
+    id = models.AutoField(primary_key=True)
+    supervisor_number = models.CharField(max_length=15, unique=False)
+    password = models.CharField(max_length=128)
+
+    ofc_division = models.CharField(max_length=100, null=True, blank=True)
+    ofc_subdivision = models.CharField(max_length=100, null=True, blank=True)
+    mr_id = models.CharField(max_length=100, null=True, blank=True)
+    mr_name = models.CharField(max_length=100, null=True, blank=True)
+    mr_number = models.CharField(max_length=100, null=True, blank=True)
+    supervisor_name = models.CharField(max_length=100, null=True, blank=True)
+
+    is_admin = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "supervisorlogin"
+
