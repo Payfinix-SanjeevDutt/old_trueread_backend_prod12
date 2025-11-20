@@ -7362,7 +7362,17 @@ def qcmobiledashboard(request):
                     ORDER BY rm2.reading_date_db DESC
                     LIMIT 1
                 ) AS geo_lat,
-
+                --last active time
+                (
+                    SELECT
+                        SPLIT_PART(rm2.rdng_date, ' ', 2)   -- extract time part
+                    FROM readingmaster rm2
+                    WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.rdng_date IS NOT NULL
+                    AND rm2.rdng_date <> ''
+                    ORDER BY rm2.rdng_date::timestamp DESC
+                    LIMIT 1
+                ) AS latest_time,
                 (
                     SELECT geo_long
                     FROM readingmaster rm2
@@ -7404,7 +7414,7 @@ def qcmobiledashboard(request):
                     )::numeric * 100
                 , 2) AS door_locked_percent,
 
-                COUNT(*) AS mr_total_readings,
+                COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) AS mr_total_readings,
 
                 COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) AS totalpassed,
                 COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END) AS totalfailed,
