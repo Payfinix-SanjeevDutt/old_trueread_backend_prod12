@@ -416,6 +416,7 @@ def consumers_bulk(request):
         # ensure defaults for new keys
         data['kvah_manual'] = data.get('kvah_manual', None)
         data['kvah_Status'] = data.get('kvah_Status', None)
+        data['mtr_sr_no'] = data.get('mtr_sr_no', None)
 
         rdng_date = data["rdng_date"]
         cons_name = data["cons_name"]
@@ -646,7 +647,8 @@ def consumers_bulk(request):
                     newid.kvah_rdng == data['kvah_rdng'] and
                     newid.kvah_img == data['kvah_img'] and
                     newid.kvah_manual == data['kvah_manual'] and
-                    newid.kvah_Status == data['kvah_Status']
+                    newid.kvah_Status == data['kvah_Status'] and
+                    newid.mtr_sr_no == data['mtr_sr_no']
                 ):
                     print("updatation does not takes place")
                     # return Response({"status": True, "message": "No change in Data"})

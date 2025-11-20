@@ -98,10 +98,8 @@ class Consumers(models.Model):
     date_qc= models.CharField(max_length=300,null=True,blank=True)
     kvah_manual = models.CharField( max_length= 200, null=True,  blank=True)
     kvah_Status = models.CharField( max_length= 200, null=True,  blank=True)
- 
-    
-    
-
+    mtr_sr_no = models.CharField( max_length= 200, null=True,  blank=True)
+   
 
     #qc fields
     abnormalities_confirm=models.CharField(max_length=300,null=True,blank=True)
