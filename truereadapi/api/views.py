@@ -7357,6 +7357,7 @@ def qcmobiledashboard(request):
                     SELECT geo_lat
                     FROM readingmaster rm2
                     WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
                     AND rm2.geo_lat IS NOT NULL
                     AND rm2.geo_lat <> ''
                     ORDER BY rm2.reading_date_db DESC
@@ -7368,6 +7369,7 @@ def qcmobiledashboard(request):
                         SPLIT_PART(rm2.rdng_date, ' ', 2)   -- extract time part
                     FROM readingmaster rm2
                     WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
                     AND rm2.rdng_date IS NOT NULL
                     AND rm2.rdng_date <> ''
                     ORDER BY rm2.rdng_date::timestamp DESC
@@ -7377,6 +7379,7 @@ def qcmobiledashboard(request):
                     SELECT geo_long
                     FROM readingmaster rm2
                     WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
                     AND rm2.geo_long IS NOT NULL
                     AND rm2.geo_long <> ''
                     ORDER BY rm2.reading_date_db DESC
