@@ -200,10 +200,7 @@ urlpatterns=[
     path('deletereconsilation/', views.deletereconsilation, name='deletereconsiliation'),
     path('uploadxlsx/', views.uploadxlsx, name='uploadxlsx'),
     path('supervisorlogin/', views.supervisorlogin, name='supervisorlogin'),
-
-    
+    path('supervisorlocation/',views.supervisorlocation,name = 'supervisorlocation')
 
     # path('testdata/',views.testdata,name='PersonView'),
-
-
     ]

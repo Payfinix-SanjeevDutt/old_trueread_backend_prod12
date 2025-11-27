@@ -6261,6 +6261,79 @@ def supervisorlogin(request):
         }
     })
 
+#deeepak
+from api.models import SupervsiorLocation
+from django.db import DatabaseError, IntegrityError
+@api_view(["POST"])
+def supervisorlocation(request):
+    try:
+        # Validate required fields
+        supervisor_number = request.data.get("supervisor_number")
+        geo_lat = request.data.get("geo_lat")
+        geo_long = request.data.get("geo_long")
+        date_str = request.data.get("date")   # format: "2025-11-27"
+
+        # Check if all required fields are present
+        if not all([supervisor_number, geo_lat, geo_long, date_str]):
+            return Response({
+                "status": False,
+                "message": "Missing required fields: supervisor_number, geo_lat, geo_long, date"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate and convert string to date
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({
+                "status": False,
+                "message": "Invalid date format. Expected format: YYYY-MM-DD"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate latitude and longitude
+        geo_lat = float(geo_lat)
+        geo_long = float(geo_long)
+            
+
+        try:
+            obj, created = SupervsiorLocation.objects.update_or_create(
+                supervisor_number=supervisor_number,
+                date=date,
+                defaults={
+                    "geo_lat": geo_lat,
+                    "geo_long": geo_long,
+                }
+            )
+
+            if created:
+                return Response({
+                    "status": True,
+                    "message": "location added",
+                })
+            else:
+                return Response({
+                    "status": True,
+                    "message": "location updated",
+                })
+                
+        except IntegrityError as e:
+            return Response({
+                "status": False,
+                "message": f"Database integrity error: {str(e)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except DatabaseError as e:
+            return Response({
+                "status": False,
+                "message": f"Database error: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+    except Exception as e:
+        return Response({
+            "status": False,
+            "message": f"An error occurred: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 @api_view(["POST"])
 def newmvcheck(request):
