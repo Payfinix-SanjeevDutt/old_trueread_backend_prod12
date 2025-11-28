@@ -6263,78 +6263,44 @@ def supervisorlogin(request):
 
 #deeepak
 from api.models import SupervsiorLocation
-from django.db import DatabaseError, IntegrityError
+from django.db import connection
+
 @api_view(["POST"])
 def supervisorlocation(request):
+    supervisor_number = request.data.get("supervisor_number")
+    geo_lat = request.data.get("geo_lat")
+    geo_long = request.data.get("geo_long")
+    date_str = request.data.get("date")
+
+    if not all([supervisor_number, geo_lat, geo_long, date_str]):
+        return Response({"status": False, "message": "Missing fields"}, status=400)
+
     try:
-        # Validate required fields
-        supervisor_number = request.data.get("supervisor_number")
-        geo_lat = request.data.get("geo_lat")
-        geo_long = request.data.get("geo_long")
-        date_str = request.data.get("date")   # format: "2025-11-27"
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"status": False, "message": "Invalid date"}, status=400)
 
-        # Check if all required fields are present
-        if not all([supervisor_number, geo_lat, geo_long, date_str]):
-            return Response({
-                "status": False,
-                "message": "Missing required fields: supervisor_number, geo_lat, geo_long, date"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate and convert string to date
-        try:
-            date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            return Response({
-                "status": False,
-                "message": "Invalid date format. Expected format: YYYY-MM-DD"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate latitude and longitude
-        geo_lat = float(geo_lat)
-        geo_long = float(geo_long)
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO supervsiorlocation 
+                    (supervisor_number, geo_lat, geo_long, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (supervisor_number, date)
+                DO UPDATE SET
+                    geo_lat = EXCLUDED.geo_lat,
+                    geo_long = EXCLUDED.geo_long
+                RETURNING (xmax = 0) AS inserted
+            """, [supervisor_number, geo_lat, geo_long, date])
             
-
-        try:
-            obj, created = SupervsiorLocation.objects.update_or_create(
-                supervisor_number=supervisor_number,
-                date=date,
-                defaults={
-                    "geo_lat": geo_lat,
-                    "geo_long": geo_long,
-                }
-            )
-
-            if created:
-                return Response({
-                    "status": True,
-                    "message": "location added",
-                })
-            else:
-                return Response({
-                    "status": True,
-                    "message": "location updated",
-                })
-                
-        except IntegrityError as e:
-            return Response({
-                "status": False,
-                "message": f"Database integrity error: {str(e)}"
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
-        except DatabaseError as e:
-            return Response({
-                "status": False,
-                "message": f"Database error: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            
+            result = cursor.fetchone()
+            created = result[0] if result else False
+        
+        message = "location added" if created else "location updated"
+        return Response({"status": True, "message": message})
+        
     except Exception as e:
-        return Response({
-            "status": False,
-            "message": f"An error occurred: {str(e)}"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-
+        return Response({"status": False, "message": f"Database error: {str(e)}"}, status=500)
 @api_view(["POST"])
 def newmvcheck(request):
     pagesize = request.data.get("pagesize", None)
