@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from django.shortcuts import render
 from rest_framework.response import Response
 import requests
@@ -45,7 +46,7 @@ from copy import deepcopy
 import math
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from openpyxl import Workbook,load_workbook
+from openpyxl import Workbook, load_workbook
 from django.http import HttpResponse
 from geojson import Point, Feature, FeatureCollection
 from pyproj import CRS
@@ -61,9 +62,6 @@ from django_filters import FilterSet
 SECRETKEY = "6AZJYQ2T317WGPXC0UHVLDOR49FIBS8N5ME"
 
 
-
-
-
 # ------------------------------v6.2.19--------------------------------------
 # @parser_classes([MultiPartParser, FormParser])
 # @api_view(["POST"])
@@ -76,7 +74,7 @@ SECRETKEY = "6AZJYQ2T317WGPXC0UHVLDOR49FIBS8N5ME"
 #     cons_ac_no = data["cons_ac_no"]
 #     if cons_name == "Test":
 #         return Response({"status": True, "message": "Test data not inserted"})
-    
+
 #     # GET OFFICE DATA
 
 #     reading_date_db = rdng_date[:10]
@@ -200,11 +198,10 @@ def consumers(request):
     rdng_date = data["rdng_date"]
     cons_name = data["cons_name"]
     cons_ac_no = data["cons_ac_no"]
-    ofc_section=data['ofc_section']
-    
+    ofc_section = data['ofc_section']
+
     if cons_name == "Test":
         return Response({"status": True, "message": "Test data not inserted"})
-
 
     reading_date_db = rdng_date[:10]
     adddate = "-01"
@@ -220,7 +217,7 @@ def consumers(request):
     data["reading_date_db"] = reading_date_db
     data["bill_month_dt"] = bill_month_add
 
-     # NEW LOGIC : IF OCR READING IS NOT FOUND SET IMAGE BLUR
+    # NEW LOGIC : IF OCR READING IS NOT FOUND SET IMAGE BLUR
     if data.get("prsnt_ocr_rdng") == "Not Found":
         data["prsnt_rdng_ocr_excep"] = "Image blur"
 
@@ -235,7 +232,8 @@ def consumers(request):
                 temp1 = min(int(prsnt_ocr_rdng_temp), int(prsnt_rdng_temp))
                 print("prsnt_ocr_rdng_temp--------->", prsnt_ocr_rdng_temp)
                 print("prsnt_rdng_temp--------->", prsnt_rdng_temp)
-                print("data['prsnt_ocr_rdng']--------->", data["prsnt_ocr_rdng"])
+                print("data['prsnt_ocr_rdng']--------->",
+                      data["prsnt_ocr_rdng"])
                 print("data['prsnt_rdng']--------->", data["prsnt_rdng"])
                 flag = False
                 if (prsnt_ocr_rdng_temp) == (prsnt_rdng_temp):
@@ -297,106 +295,106 @@ def consumers(request):
 
     newid = (
         Consumers.objects.filter(
-            Q(bill_month_dt=bill_month_add) & Q(cons_ac_no=cons_ac_no) &Q(ofc_section=ofc_section)
+            Q(bill_month_dt=bill_month_add) & Q(
+                cons_ac_no=cons_ac_no) & Q(ofc_section=ofc_section)
         )
         .order_by("-id")
         .first()
     )
 
-
     print("newid", newid)
     if newid is not None:
-    # Check all the columns only then update
+        # Check all the columns only then update
         if (
-    newid.ofc_discom == data['ofc_discom'] and
-    newid.ofc_zone == data['ofc_zone'] and
-    newid.ofc_circle == data['ofc_circle'] and
-    newid.ofc_division == data['ofc_division'] and
-    newid.ofc_sub_div_code == data['ofc_sub_div_code'] and
-    newid.ofc_subdivision == data['ofc_subdivision'] and
-    newid.ofc_section == data['ofc_section'] and
-    newid.mr_unit == data['mr_unit'] and
-    newid.bl_area_code == data['bl_area_code'] and
-    newid.bl_agnc_type == data['bl_agnc_type'] and
-    newid.bl_agnc_name == data['bl_agnc_name'] and
-    newid.mr_id == data['mr_id'] and
-    newid.mr_ph_no == data['mr_ph_no'] and
-    newid.cons_ac_no == data['cons_ac_no'] and
-    newid.cons_name == data['cons_name'] and
-    newid.con_trf_cat == data['con_trf_cat'] and
-    newid.con_mtr_sl_no == data['con_mtr_sl_no'] and
-    newid.con_mtr_phs == data['con_mtr_phs'] and
-    newid.rdng_req_val == data['rdng_req_val'] and
-    newid.prev_rdng == data['prev_rdng'] and
-    newid.prev_md == data['prev_md'] and
-    newid.prev_pf_rdng == data['prev_pf_rdng'] and
-    newid.prev_rdng_date == data['prev_rdng_date'] and
-    newid.prev_rdng_status == data['prev_rdng_status'] and
-    newid.bl_mnth == data['bl_mnth'] and
-    newid.rdng_date == data['rdng_date'] and
-    newid.geo_lat == data['geo_lat'] and
-    newid.geo_long == data['geo_long'] and
-    newid.prsnt_mtr_status == data['prsnt_mtr_status'] and
-    newid.abnormality == data['abnormality'] and
-    newid.mr_rmrk == data['mr_rmrk'] and
-    newid.rdng_ocr_status == data['rdng_ocr_status'] and
-    newid.prsnt_ocr_rdng == data['prsnt_ocr_rdng'] and
-    newid.prsnt_rdng == data['prsnt_rdng'] and
-    newid.prsnt_rdng_ocr_excep == data['prsnt_rdng_ocr_excep'] and
-    newid.rdng_img == data['rdng_img'] and
-    newid.ocr_md_status == data['ocr_md_status'] and
-    newid.prsnt_md_rdng_ocr == data['prsnt_md_rdng_ocr'] and
-    newid.prsnt_md_rdng == data['prsnt_md_rdng'] and
-    newid.md_ocr_excep == data['md_ocr_excep'] and
-    newid.md_img == data['md_img'] and
-    newid.ocr_pf_status == data['ocr_pf_status'] and
-    newid.ocr_pf_reading == data['ocr_pf_reading'] and
-    newid.pf_manual_reading == data['pf_manual_reading'] and
-    newid.pf_ocr_exception == data['pf_ocr_exception'] and
-    newid.pf_image == data['pf_image'] and
-    newid.ai_mdl_ver == data['ai_mdl_ver'] and
-    newid.ph_name == data['ph_name'] and
-    newid.cmra_res == data['cmra_res'] and
-    newid.andr_ver == data['andr_ver'] and
-    newid.qc_req == data['qc_req'] and
-    newid.ba_cons_id == data['ba_cons_id'] and
-    newid.ba_ac_id == data['ba_ac_id'] and
-    newid.ba_prsnt_rdng_status == data['ba_prsnt_rdng_status'] and
-    newid.ba_mrc == data['ba_mrc'] and
-    newid.ba_mru == data['ba_mru'] and
-    newid.ba_subdiv == data['ba_subdiv'] and
-    newid.ba_div == data['ba_div'] and
-    newid.ba_agnc_id == data['ba_agnc_id'] and
-    newid.ba_bl_id == data['ba_bl_id'] and
-    newid.ba_bl_date == data['ba_bl_date'] and
-    newid.ba_prev_rdng_status == data['ba_prev_rdng_status'] and
-    newid.qc_done == data['qc_done'] and
-    newid.qc_done_user_id == data['qc_done_user_id'] and
-    newid.qc_date == data['qc_date'] and
-    newid.qc_flag == data['qc_flag'] and
-    newid.qc_rmrk == data['qc_rmrk'] and
-    newid.ai_retrain == data['ai_retrain'] and
-    newid.is_object_meter == data['is_object_meter'] and
-    newid.mr_success_feedback == data['mr_success_feedback'] and
-    newid.reading_parameter_type == data['reading_parameter_type'] and
-    newid.md_reading_parameter_type == data['md_reading_parameter_type'] and
-    newid.pf_reading_parameter_type == data['pf_reading_parameter_type'] and
-    newid.rdng_ocr_status_changed_by == data['rdng_ocr_status_changed_by'] and
-    newid.prsnt_rdng_ocr_odv == data['prsnt_rdng_ocr_odv'] and
-    newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
-    newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values']
-):
+            newid.ofc_discom == data['ofc_discom'] and
+            newid.ofc_zone == data['ofc_zone'] and
+            newid.ofc_circle == data['ofc_circle'] and
+            newid.ofc_division == data['ofc_division'] and
+            newid.ofc_sub_div_code == data['ofc_sub_div_code'] and
+            newid.ofc_subdivision == data['ofc_subdivision'] and
+            newid.ofc_section == data['ofc_section'] and
+            newid.mr_unit == data['mr_unit'] and
+            newid.bl_area_code == data['bl_area_code'] and
+            newid.bl_agnc_type == data['bl_agnc_type'] and
+            newid.bl_agnc_name == data['bl_agnc_name'] and
+            newid.mr_id == data['mr_id'] and
+            newid.mr_ph_no == data['mr_ph_no'] and
+            newid.cons_ac_no == data['cons_ac_no'] and
+            newid.cons_name == data['cons_name'] and
+            newid.con_trf_cat == data['con_trf_cat'] and
+            newid.con_mtr_sl_no == data['con_mtr_sl_no'] and
+            newid.con_mtr_phs == data['con_mtr_phs'] and
+            newid.rdng_req_val == data['rdng_req_val'] and
+            newid.prev_rdng == data['prev_rdng'] and
+            newid.prev_md == data['prev_md'] and
+            newid.prev_pf_rdng == data['prev_pf_rdng'] and
+            newid.prev_rdng_date == data['prev_rdng_date'] and
+            newid.prev_rdng_status == data['prev_rdng_status'] and
+            newid.bl_mnth == data['bl_mnth'] and
+            newid.rdng_date == data['rdng_date'] and
+            newid.geo_lat == data['geo_lat'] and
+            newid.geo_long == data['geo_long'] and
+            newid.prsnt_mtr_status == data['prsnt_mtr_status'] and
+            newid.abnormality == data['abnormality'] and
+            newid.mr_rmrk == data['mr_rmrk'] and
+            newid.rdng_ocr_status == data['rdng_ocr_status'] and
+            newid.prsnt_ocr_rdng == data['prsnt_ocr_rdng'] and
+            newid.prsnt_rdng == data['prsnt_rdng'] and
+            newid.prsnt_rdng_ocr_excep == data['prsnt_rdng_ocr_excep'] and
+            newid.rdng_img == data['rdng_img'] and
+            newid.ocr_md_status == data['ocr_md_status'] and
+            newid.prsnt_md_rdng_ocr == data['prsnt_md_rdng_ocr'] and
+            newid.prsnt_md_rdng == data['prsnt_md_rdng'] and
+            newid.md_ocr_excep == data['md_ocr_excep'] and
+            newid.md_img == data['md_img'] and
+            newid.ocr_pf_status == data['ocr_pf_status'] and
+            newid.ocr_pf_reading == data['ocr_pf_reading'] and
+            newid.pf_manual_reading == data['pf_manual_reading'] and
+            newid.pf_ocr_exception == data['pf_ocr_exception'] and
+            newid.pf_image == data['pf_image'] and
+            newid.ai_mdl_ver == data['ai_mdl_ver'] and
+            newid.ph_name == data['ph_name'] and
+            newid.cmra_res == data['cmra_res'] and
+            newid.andr_ver == data['andr_ver'] and
+            newid.qc_req == data['qc_req'] and
+            newid.ba_cons_id == data['ba_cons_id'] and
+            newid.ba_ac_id == data['ba_ac_id'] and
+            newid.ba_prsnt_rdng_status == data['ba_prsnt_rdng_status'] and
+            newid.ba_mrc == data['ba_mrc'] and
+            newid.ba_mru == data['ba_mru'] and
+            newid.ba_subdiv == data['ba_subdiv'] and
+            newid.ba_div == data['ba_div'] and
+            newid.ba_agnc_id == data['ba_agnc_id'] and
+            newid.ba_bl_id == data['ba_bl_id'] and
+            newid.ba_bl_date == data['ba_bl_date'] and
+            newid.ba_prev_rdng_status == data['ba_prev_rdng_status'] and
+            newid.qc_done == data['qc_done'] and
+            newid.qc_done_user_id == data['qc_done_user_id'] and
+            newid.qc_date == data['qc_date'] and
+            newid.qc_flag == data['qc_flag'] and
+            newid.qc_rmrk == data['qc_rmrk'] and
+            newid.ai_retrain == data['ai_retrain'] and
+            newid.is_object_meter == data['is_object_meter'] and
+            newid.mr_success_feedback == data['mr_success_feedback'] and
+            newid.reading_parameter_type == data['reading_parameter_type'] and
+            newid.md_reading_parameter_type == data['md_reading_parameter_type'] and
+            newid.pf_reading_parameter_type == data['pf_reading_parameter_type'] and
+            newid.rdng_ocr_status_changed_by == data['rdng_ocr_status_changed_by'] and
+            newid.prsnt_rdng_ocr_odv == data['prsnt_rdng_ocr_odv'] and
+            newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
+            newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values']
+        ):
             print("updatation does not takes place")
             return Response({"status": True, "message": "No change in Data"})
         else:
             print("updating as some of the values are changed")
-        
+
             serializer = ConsumerSerializer(newid, data=data, partial=True)
             if serializer.is_valid():
                 serializer.save()
                 return Response({"status": True, "message": "Data Updated successfully"})
             return Response(serializer.errors)
-            
+
     # if bill id is not present then insert
     print("inserted")
     serializer = ConsumerSerializer(data=data)
@@ -411,36 +409,20 @@ def consumers(request):
 @api_view(["POST"])
 def consumers_bulk(request):
     data_list = request.data.copy()
-    print("datalist---Ibsar>",data_list)
-    count_insert=0
-    count_update=0
-    failed_consumers=[]
-    
+    print("datalist--->", data_list)
+    count_insert = 0
+    count_update = 0
+    failed_consumers = []
     for data in data_list:
  
         rdng_date = data["rdng_date"]
         cons_name = data["cons_name"]
         cons_ac_no = data["cons_ac_no"]
-        ofc_section=data['ofc_section']
-        rdngImg = data.get("rdng_img")
+        ofc_section = data['ofc_section']
 
-        # Ensure rdngImg is a clean string (not list or nested)
-        if isinstance(rdngImg, list):
-            rdngImg = rdngImg[0]
-        elif isinstance(rdngImg, dict) and "url" in rdngImg:
-            rdngImg = rdngImg["url"]
-        elif not isinstance(rdngImg, str):
-            rdngImg = str(rdngImg)
-
-        # strip extra quotes or spaces
-        rdngImg = rdngImg.strip('"').strip()
-
-       
-       
         if cons_name == "Test":
             return Response({"status": True, "message": "Test data not inserted"})
- 
- 
+
         reading_date_db = rdng_date[:10]
         adddate = "-01"
         bill_month_add = reading_date_db[:7] + adddate
@@ -454,9 +436,7 @@ def consumers_bulk(request):
         # comment this line
         data["reading_date_db"] = reading_date_db
         data["bill_month_dt"] = bill_month_add
-        
-        
-        
+
         # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
         # try:
         #     if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
@@ -470,14 +450,11 @@ def consumers_bulk(request):
         # except Exception as e:
         #     print("Lambda call failed:", str(e))
 
-
-       
-          
         char = 0
         ba_bl_id = data["ba_bl_id"]
-        
+
         rdngImg = data.get("rdng_img")
- 
+
         # Ensure rdngImg is a clean string (not list or nested)
         if isinstance(rdngImg, list):
             rdngImg = rdngImg[0]
@@ -485,27 +462,26 @@ def consumers_bulk(request):
             rdngImg = rdngImg["url"]
         elif not isinstance(rdngImg, str):
             rdngImg = str(rdngImg)
- 
+
         # strip extra quotes or spaces
         rdngImg = rdngImg.strip('"').strip()
-        
-        try:
-            if data.get("rdng_ocr_status") in ["Failed"]:
-                # lambda_url = "https://biharqc.true-read.com"
-                lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
-                payload = {"image_url": rdngImg}
-                response = requests.post(lambda_url, json=payload, timeout=60)
-                if response.status_code == 200:
-                    lambda_result = response.json().get("result")
-                    # if lambda_result == "Passed":  # meter not present
-                    data["rdng_ocr_status"] = lambda_result
-                    if lambda_result == 'Passed': 
-                        data["qc_done"] = 'byLambda'
-                
-                       
-        except Exception as e:
-            print("Lambda call failed:", str(e))
-        
+
+        # try:
+        #     if data.get("rdng_ocr_status") in ["Failed"]:
+        #         lambda_url = "https://biharqc.true-read.com"
+        #         # lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
+        #         payload = {"image_url": rdngImg}
+        #         response = requests.post(lambda_url, json=payload, timeout=60)
+        #         if response.status_code == 200:
+        #             lambda_result = response.json().get("result")
+        #             # if lambda_result == "Passed":  # meter not present
+        #             data["rdng_ocr_status"] = lambda_result
+        #             if lambda_result == 'Passed':
+        #                 data["qc_done"] = 'byLambda'
+
+        # except Exception as e:
+        #     print("Lambda call failed:", str(e))
+
         try:
             if data["prsnt_mtr_status"] == "Ok":
                 if data["prsnt_ocr_rdng"] != "Not Found":
@@ -515,7 +491,8 @@ def consumers_bulk(request):
                     temp1 = min(int(prsnt_ocr_rdng_temp), int(prsnt_rdng_temp))
                     print("prsnt_ocr_rdng_temp--------->", prsnt_ocr_rdng_temp)
                     print("prsnt_rdng_temp--------->", prsnt_rdng_temp)
-                    print("data['prsnt_ocr_rdng']--------->", data["prsnt_ocr_rdng"])
+                    print("data['prsnt_ocr_rdng']--------->",
+                          data["prsnt_ocr_rdng"])
                     print("data['prsnt_rdng']--------->", data["prsnt_rdng"])
                     flag = False
                     if (prsnt_ocr_rdng_temp) == (prsnt_rdng_temp):
@@ -575,109 +552,108 @@ def consumers_bulk(request):
         try:
             newid = (
                 Consumers.objects.filter(
-                    Q(bill_month_dt=bill_month_add) & Q(cons_ac_no=cons_ac_no) &Q(ofc_section=ofc_section)
+                    Q(bill_month_dt=bill_month_add) & Q(
+                        cons_ac_no=cons_ac_no) & Q(ofc_section=ofc_section)
                 )
                 .order_by("-id")
                 .first()
             )
- 
- 
             print("newid", newid)
             if newid is not None:
-            # Check all the columns only then update
+                # Check all the columns only then update
                 if (
-            newid.ofc_discom == data['ofc_discom'] and
-            newid.ofc_zone == data['ofc_zone'] and
-            newid.ofc_circle == data['ofc_circle'] and
-            newid.ofc_division == data['ofc_division'] and
-            newid.ofc_sub_div_code == data['ofc_sub_div_code'] and
-            newid.ofc_subdivision == data['ofc_subdivision'] and
-            newid.ofc_section == data['ofc_section'] and
-            newid.mr_unit == data['mr_unit'] and
-            newid.bl_area_code == data['bl_area_code'] and
-            newid.bl_agnc_type == data['bl_agnc_type'] and
-            newid.bl_agnc_name == data['bl_agnc_name'] and
-            newid.mr_id == data['mr_id'] and
-            newid.mr_ph_no == data['mr_ph_no'] and
-            newid.cons_ac_no == data['cons_ac_no'] and
-            newid.cons_name == data['cons_name'] and
-            newid.con_trf_cat == data['con_trf_cat'] and
-            newid.con_mtr_sl_no == data['con_mtr_sl_no'] and
-            newid.con_mtr_phs == data['con_mtr_phs'] and
-            newid.rdng_req_val == data['rdng_req_val'] and
-            newid.prev_rdng == data['prev_rdng'] and
-            newid.prev_md == data['prev_md'] and
-            newid.prev_pf_rdng == data['prev_pf_rdng'] and
-            newid.prev_rdng_date == data['prev_rdng_date'] and
-            newid.prev_rdng_status == data['prev_rdng_status'] and
-            newid.bl_mnth == data['bl_mnth'] and
-            newid.rdng_date == data['rdng_date'] and
-            newid.geo_lat == data['geo_lat'] and
-            newid.geo_long == data['geo_long'] and
-            newid.prsnt_mtr_status == data['prsnt_mtr_status'] and
-            newid.abnormality == data['abnormality'] and
-            newid.mr_rmrk == data['mr_rmrk'] and
-            newid.rdng_ocr_status == data['rdng_ocr_status'] and
-            newid.prsnt_ocr_rdng == data['prsnt_ocr_rdng'] and
-            newid.prsnt_rdng == data['prsnt_rdng'] and
-            newid.prsnt_rdng_ocr_excep == data['prsnt_rdng_ocr_excep'] and
-            newid.rdng_img == data['rdng_img'] and
-            newid.ocr_md_status == data['ocr_md_status'] and
-            newid.prsnt_md_rdng_ocr == data['prsnt_md_rdng_ocr'] and
-            newid.prsnt_md_rdng == data['prsnt_md_rdng'] and
-            newid.md_ocr_excep == data['md_ocr_excep'] and
-            newid.md_img == data['md_img'] and
-            newid.ocr_pf_status == data['ocr_pf_status'] and
-            newid.ocr_pf_reading == data['ocr_pf_reading'] and
-            newid.pf_manual_reading == data['pf_manual_reading'] and
-            newid.pf_ocr_exception == data['pf_ocr_exception'] and
-            newid.pf_image == data['pf_image'] and
-            newid.ai_mdl_ver == data['ai_mdl_ver'] and
-            newid.ph_name == data['ph_name'] and
-            newid.cmra_res == data['cmra_res'] and
-            newid.andr_ver == data['andr_ver'] and
-            newid.data_sync_date == data['data_sync_date'] and
-            newid.qc_req == data['qc_req'] and
-            newid.ba_cons_id == data['ba_cons_id'] and
-            newid.ba_ac_id == data['ba_ac_id'] and
-            newid.ba_prsnt_rdng_status == data['ba_prsnt_rdng_status'] and
-            newid.ba_mrc == data['ba_mrc'] and
-            newid.ba_mru == data['ba_mru'] and
-            newid.ba_subdiv == data['ba_subdiv'] and
-            newid.ba_div == data['ba_div'] and
-            newid.ba_agnc_id == data['ba_agnc_id'] and
-            newid.ba_bl_id == data['ba_bl_id'] and
-            newid.ba_bl_date == data['ba_bl_date'] and
-            newid.ba_prev_rdng_status == data['ba_prev_rdng_status'] and
-            newid.qc_done == data['qc_done'] and
-            newid.qc_done_user_id == data['qc_done_user_id'] and
-            newid.qc_date == data['qc_date'] and
-            newid.qc_flag == data['qc_flag'] and
-            newid.qc_rmrk == data['qc_rmrk'] and
-            newid.ai_retrain == data['ai_retrain'] and
-            newid.is_object_meter == data['is_object_meter'] and
-            newid.mr_success_feedback == data['mr_success_feedback'] and
-            newid.reading_parameter_type == data['reading_parameter_type'] and
-            newid.md_reading_parameter_type == data['md_reading_parameter_type'] and
-            newid.pf_reading_parameter_type == data['pf_reading_parameter_type'] and
-            newid.rdng_ocr_status_changed_by == data['rdng_ocr_status_changed_by'] and
-            newid.prsnt_rdng_ocr_odv == data['prsnt_rdng_ocr_odv'] and
-            newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
-            newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values'] and
-            newid.kvah_rdng == data['kvah_rdng'] and
-            newid.kvah_img == data['kvah_img']
-        ):
+                    newid.ofc_discom == data['ofc_discom'] and
+                    newid.ofc_zone == data['ofc_zone'] and
+                    newid.ofc_circle == data['ofc_circle'] and
+                    newid.ofc_division == data['ofc_division'] and
+                    newid.ofc_sub_div_code == data['ofc_sub_div_code'] and
+                    newid.ofc_subdivision == data['ofc_subdivision'] and
+                    newid.ofc_section == data['ofc_section'] and
+                    newid.mr_unit == data['mr_unit'] and
+                    newid.bl_area_code == data['bl_area_code'] and
+                    newid.bl_agnc_type == data['bl_agnc_type'] and
+                    newid.bl_agnc_name == data['bl_agnc_name'] and
+                    newid.mr_id == data['mr_id'] and
+                    newid.mr_ph_no == data['mr_ph_no'] and
+                    newid.cons_ac_no == data['cons_ac_no'] and
+                    newid.cons_name == data['cons_name'] and
+                    newid.con_trf_cat == data['con_trf_cat'] and
+                    newid.con_mtr_sl_no == data['con_mtr_sl_no'] and
+                    newid.con_mtr_phs == data['con_mtr_phs'] and
+                    newid.rdng_req_val == data['rdng_req_val'] and
+                    newid.prev_rdng == data['prev_rdng'] and
+                    newid.prev_md == data['prev_md'] and
+                    newid.prev_pf_rdng == data['prev_pf_rdng'] and
+                    newid.prev_rdng_date == data['prev_rdng_date'] and
+                    newid.prev_rdng_status == data['prev_rdng_status'] and
+                    newid.bl_mnth == data['bl_mnth'] and
+                    newid.rdng_date == data['rdng_date'] and
+                    newid.geo_lat == data['geo_lat'] and
+                    newid.geo_long == data['geo_long'] and
+                    newid.prsnt_mtr_status == data['prsnt_mtr_status'] and
+                    newid.abnormality == data['abnormality'] and
+                    newid.mr_rmrk == data['mr_rmrk'] and
+                    newid.rdng_ocr_status == data['rdng_ocr_status'] and
+                    newid.prsnt_ocr_rdng == data['prsnt_ocr_rdng'] and
+                    newid.prsnt_rdng == data['prsnt_rdng'] and
+                    newid.prsnt_rdng_ocr_excep == data['prsnt_rdng_ocr_excep'] and
+                    newid.rdng_img == data['rdng_img'] and
+                    newid.ocr_md_status == data['ocr_md_status'] and
+                    newid.prsnt_md_rdng_ocr == data['prsnt_md_rdng_ocr'] and
+                    newid.prsnt_md_rdng == data['prsnt_md_rdng'] and
+                    newid.md_ocr_excep == data['md_ocr_excep'] and
+                    newid.md_img == data['md_img'] and
+                    newid.ocr_pf_status == data['ocr_pf_status'] and
+                    newid.ocr_pf_reading == data['ocr_pf_reading'] and
+                    newid.pf_manual_reading == data['pf_manual_reading'] and
+                    newid.pf_ocr_exception == data['pf_ocr_exception'] and
+                    newid.pf_image == data['pf_image'] and
+                    newid.ai_mdl_ver == data['ai_mdl_ver'] and
+                    newid.ph_name == data['ph_name'] and
+                    newid.cmra_res == data['cmra_res'] and
+                    newid.andr_ver == data['andr_ver'] and
+                    newid.data_sync_date == data['data_sync_date'] and
+                    newid.qc_req == data['qc_req'] and
+                    newid.ba_cons_id == data['ba_cons_id'] and
+                    newid.ba_ac_id == data['ba_ac_id'] and
+                    newid.ba_prsnt_rdng_status == data['ba_prsnt_rdng_status'] and
+                    newid.ba_mrc == data['ba_mrc'] and
+                    newid.ba_mru == data['ba_mru'] and
+                    newid.ba_subdiv == data['ba_subdiv'] and
+                    newid.ba_div == data['ba_div'] and
+                    newid.ba_agnc_id == data['ba_agnc_id'] and
+                    newid.ba_bl_id == data['ba_bl_id'] and
+                    newid.ba_bl_date == data['ba_bl_date'] and
+                    newid.ba_prev_rdng_status == data['ba_prev_rdng_status'] and
+                    newid.qc_done == data['qc_done'] and
+                    newid.qc_done_user_id == data['qc_done_user_id'] and
+                    newid.qc_date == data['qc_date'] and
+                    newid.qc_flag == data['qc_flag'] and
+                    newid.qc_rmrk == data['qc_rmrk'] and
+                    newid.ai_retrain == data['ai_retrain'] and
+                    newid.is_object_meter == data['is_object_meter'] and
+                    newid.mr_success_feedback == data['mr_success_feedback'] and
+                    newid.reading_parameter_type == data['reading_parameter_type'] and
+                    newid.md_reading_parameter_type == data['md_reading_parameter_type'] and
+                    newid.pf_reading_parameter_type == data['pf_reading_parameter_type'] and
+                    newid.rdng_ocr_status_changed_by == data['rdng_ocr_status_changed_by'] and
+                    newid.prsnt_rdng_ocr_odv == data['prsnt_rdng_ocr_odv'] and
+                    newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
+                    newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values'] and
+                    newid.kvah_rdng == data['kvah_rdng'] and
+                    newid.kvah_img == data['kvah_img']
+                ):
                     print("updatation does not takes place")
                     # return Response({"status": True, "message": "No change in Data"})
                 else:
                     print("updating as some of the values are changed")
-               
-                    serializer = ConsumerSerializer(newid, data=data, partial=True)
+
+                    serializer = ConsumerSerializer(
+                        newid, data=data, partial=True)
                     if serializer.is_valid():
                         serializer.save()
-                        count_update+=1
-       
-                   
+                        count_update += 1
+
             # if bill id is not present then insert
  
             else:
@@ -685,20 +661,22 @@ def consumers_bulk(request):
                 serializer = ConsumerSerializer(data=data)
                 if serializer.is_valid():
                     serializer.save()
-                    count_insert+=1
- 
+                    count_insert += 1
+
         except Exception as e:
-            failedCons={"message":str(e),"cons_ac_no":data['cons_ac_no']}
+            failedCons = {"message": str(e), "cons_ac_no": data['cons_ac_no']}
             failed_consumers.append(failedCons)
-           
     print({"status": True, "message": f"Data inserted {count_insert} and Data updated {count_update}", "version": "28"})
-    if len(failed_consumers)>0:
+    if len(failed_consumers) > 0:
         return Response(
-                    {"status": False, "message": f"Data inserted {count_insert} and Data updated {count_update}","failed_consumers":failed_consumers, "version": "28"}
-                )
+            {"status": False, "message": f"Data inserted {count_insert} and Data updated {count_update}",
+                "failed_consumers": failed_consumers, "version": "28"}
+        )
     return Response(
-                    {"status": True, "message": f"Data inserted {count_insert} and Data updated {count_update}","failed_consumers":failed_consumers, "version": "28"}
-                )
+        {"status": True, "message": f"Data inserted {count_insert} and Data updated {count_update}",
+            "failed_consumers": failed_consumers, "version": "28"}
+    )
+
 
 @api_view(["GET"])
 def getconsumers(request):
@@ -749,7 +727,8 @@ def meterReaderRegistrationfun(request):
             status=status.HTTP_201_CREATED,
         )
     return Response(
-        {"status": False, "message": "Meter Reader Id Already exists (from api)"},
+        {"status": False,
+            "message": "Meter Reader Id Already exists (from api)"},
         status=status.HTTP_200_OK,
     )
 
@@ -762,7 +741,8 @@ def meterReaderRegistrationUpdateOffice(request):
     id = MeterReaderRegistration.objects.get(mrId=mrId)
     if id is None:
         return Response(
-            {"status": False, "message": "Meter Reader Id Does Not exists (from api)"},
+            {"status": False,
+                "message": "Meter Reader Id Does Not exists (from api)"},
             status=status.HTTP_200_OK,
         )
     serializer = MeterReaderRegistrationSerializer(id, data=data, partial=True)
@@ -788,7 +768,8 @@ def metereReaderlogin(request):
     token = newdata["androidToken"]
     try:
         id = MeterReaderRegistration.objects.get(mrId=mrId)
-        serializer = MeterReaderRegistrationSerializer(id, data=newdata, partial=True)
+        serializer = MeterReaderRegistrationSerializer(
+            id, data=newdata, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -893,7 +874,8 @@ def loginuser(request):
     try:
         if email == "payfinix@gmail.com" and password == "payfinix#123":
             print("hello")
-            token = jwt.encode({"agentid": email}, SECRETKEY, algorithm="HS256")
+            token = jwt.encode({"agentid": email},
+                               SECRETKEY, algorithm="HS256")
             # return Response({"user":"admin","token":token})
             return Response({"user": "admin", "accessToken": token})
 
@@ -1072,7 +1054,8 @@ def get_meter_summary(request):
             ocrwithexceppercent = math.floor(
                 (((ocrwithexcep / okreadings) if okreadings else 0) * 100)
             )
-            meterdefectivepercent = math.floor(((meterdefective / total) * 100))
+            meterdefectivepercent = math.floor(
+                ((meterdefective / total) * 100))
             doorlockedpercent = math.floor(((doorlocked / total) * 100))
 
             # add to dictionary
@@ -2032,7 +2015,8 @@ def getmridforSection(request):
     data = request.data.get("sectioncode", None)
     newlist = []
     mridData = (
-        Consumers.objects.filter(ofc_section=data).values_list("mr_id").distinct()
+        Consumers.objects.filter(
+            ofc_section=data).values_list("mr_id").distinct()
     )
     # serializer = ConsumerDataSerializer(mridData,many=True)
     for row in mridData:
@@ -2190,7 +2174,8 @@ def mrwisedailydata(request):
     # query=f''''
     # from readingmaster r where r.reading_date_db={today}
     # '''
-    result = dict(cursor.execute("SELECT r.mr_id as mrid FROM readingmaster r"))
+    result = dict(cursor.execute(
+        "SELECT r.mr_id as mrid FROM readingmaster r"))
     print("result---->", result)
 
     return Response("result")
@@ -2606,7 +2591,8 @@ GROUP BY r.mr_id,r.ofc_discom,r.ofc_zone,r.ofc_circle,r.ofc_division,r.ofc_subdi
             meterdefectivepercent = round(
                 (((meterdefective / total) if total else 0) * 100), 2
             )
-            doorlockedpercent = round((((doorlocked / total) if total else 0) * 100), 2)
+            doorlockedpercent = round(
+                (((doorlocked / total) if total else 0) * 100), 2)
             # add to dictionary
             newdict["mrid"] = row[0]
             # newdict['mrPhone'] = row[10]
@@ -2977,7 +2963,8 @@ def to_geojson(entries):
             del entry["geo_long"]
             feature = Feature(geometry=point, properties=entry)
             features.append(feature)
-    crs = {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}
+    crs = {"type": "name", "properties": {
+        "name": "urn:ogc:def:crs:OGC:1.3:CRS84"}}
     feature_collection = FeatureCollection(crs=crs, features=features)
     return feature_collection
 
@@ -3597,7 +3584,8 @@ def get_meter_summarytest(request):
             ocrwithexceppercent = math.floor(
                 (((ocrwithexcep / okreadings) if okreadings else 0) * 100)
             )
-            meterdefectivepercent = math.floor(((meterdefective / total) * 100))
+            meterdefectivepercent = math.floor(
+                ((meterdefective / total) * 100))
             doorlockedpercent = math.floor(((doorlocked / total) * 100))
 
             # add to dictionary
@@ -5177,7 +5165,7 @@ def meterWiseReportconsumer(request):
 #     filters = request.data.get("filters", None)
 
 #     try:
-      
+
 #         clause += "AND "
 #         clause += (
 #             f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'"
@@ -5228,11 +5216,11 @@ def meterWiseReportconsumer(request):
 #             if "con_trf_cat" in filters
 #             else ""
 #         )
-        
+
 
 #     except:
 #         pass
-    
+
 #     query = f"""SELECT
 # mr_id,
 # COUNT(*) AS total,
@@ -5244,7 +5232,7 @@ def meterWiseReportconsumer(request):
 # (COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) - COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) AS diff,
 # ofc_division,ofc_subdivision
 # FROM
-# readingmaster where mr_id !='' 
+# readingmaster where mr_id !=''
 # {clause}
 # GROUP BY
 # mr_id,ofc_division,ofc_subdivision;
@@ -5302,7 +5290,7 @@ def meterWiseReportconsumer(request):
 #     except:
 #         return Response([])
 
-#Sanjeev
+# Sanjeev
 @api_view(["POST"])
 def new_get_meter_summary(request):
     today = datetime.now()
@@ -5356,7 +5344,7 @@ def new_get_meter_summary(request):
     clause += (
         f"extract(month from {tablename}.reading_date_db) = '{month}' AND extract(year from {tablename}.reading_date_db) = '{year}'"
         if "month" not in filters
-        else f"  extract(month from {tablename}.reading_date_db) = '{ filters['month'].split('-')[1]}' AND extract(year from {tablename}.reading_date_db) = '{filters['month'].split('-')[0]}'"
+        else f"  extract(month from {tablename}.reading_date_db) = '{filters['month'].split('-')[1]}' AND extract(year from {tablename}.reading_date_db) = '{filters['month'].split('-')[0]}'"
     )
     clause += (
         f"and {tablename}.bl_agnc_name='{filters['bl_agnc_name']}'"
@@ -5422,7 +5410,7 @@ def new_get_meter_summary(request):
     print("Query:", query)
     cursor.execute(query)
     results = cursor.fetchall()
-    
+
     try:
         newdata = []  # Initialize newdata list
         for row in results:
@@ -5436,11 +5424,16 @@ def new_get_meter_summary(request):
             subdivision = row[9]
 
             # Percentage calculations
-            okreadpercent = math.floor((((okreadings / total) if total else 0) * 100))
-            ocrreadingpercent = math.floor((((ocrreadings / okreadings) if okreadings else 0) * 100))
-            ocrwithexceppercent = math.floor((((ocrwithexcep / okreadings) if okreadings else 0) * 100))
-            meterdefectivepercent = math.floor((((meterdefective / total) if total else 0) * 100))
-            doorlockedpercent = math.floor((((doorlocked / total) if total else 0) * 100))
+            okreadpercent = math.floor(
+                (((okreadings / total) if total else 0) * 100))
+            ocrreadingpercent = math.floor(
+                (((ocrreadings / okreadings) if okreadings else 0) * 100))
+            ocrwithexceppercent = math.floor(
+                (((ocrwithexcep / okreadings) if okreadings else 0) * 100))
+            meterdefectivepercent = math.floor(
+                (((meterdefective / total) if total else 0) * 100))
+            doorlockedpercent = math.floor(
+                (((doorlocked / total) if total else 0) * 100))
 
             # Constructing dictionary
             newdict = {
@@ -5468,11 +5461,6 @@ def new_get_meter_summary(request):
     except Exception as e:
         print("Error:", e)
         return Response([])
-
-
-
-
-
 
 
 # @api_view(["POST"])
@@ -5558,8 +5546,7 @@ def new_get_meter_summary(request):
 #         return Response([])
 
 
-
-#Sanjeev
+# Sanjeev
 
 
 @api_view(["POST"])
@@ -5571,7 +5558,8 @@ def newagencywisesummary(request):
     filters = request.data.get("filters", {})
     selected_month = filters.get("month")
 
-    tablename = "prevmonthsdata" if selected_month not in {this_month, previous_month} else "readingmaster"
+    tablename = "prevmonthsdata" if selected_month not in {
+        this_month, previous_month} else "readingmaster"
 
     clause = ""
     if filters:
@@ -5586,7 +5574,7 @@ def newagencywisesummary(request):
                 clause += f"'{value}' AND "
             elif key == "ofc_discom":
                 clause += f"{tablename}.ofc_discom = '{value}' AND "
-    
+
     # Remove trailing 'AND'
     clause = clause.rstrip("AND ")
 
@@ -5609,12 +5597,12 @@ def newagencywisesummary(request):
             {tablename}.bl_agnc_name
     """
     print("QUERY", query)
-    
+
     try:
         cursor = connection.cursor()
         cursor.execute(query)
         result = cursor.fetchall()
-        
+
         newdata = []
         for row in result:
             total = row[1]
@@ -5623,14 +5611,19 @@ def newagencywisesummary(request):
             ocrwithexcep = row[4]
             meterdefective = row[5]
             doorlocked = row[6]
-            
+
             # Percentage
-            okreadpercent = math.floor((okreadings / total) * 100) if total else 0
-            ocrreadingpercent = math.floor((ocrreadings / okreadings) * 100) if okreadings else 0
-            ocrwithexceppercent = math.floor((ocrwithexcep / okreadings) * 100) if okreadings else 0
-            meterdefectivepercent = math.floor((meterdefective / total) * 100) if total else 0
-            doorlockedpercent = math.floor((doorlocked / total) * 100) if total else 0
-            
+            okreadpercent = math.floor(
+                (okreadings / total) * 100) if total else 0
+            ocrreadingpercent = math.floor(
+                (ocrreadings / okreadings) * 100) if okreadings else 0
+            ocrwithexceppercent = math.floor(
+                (ocrwithexcep / okreadings) * 100) if okreadings else 0
+            meterdefectivepercent = math.floor(
+                (meterdefective / total) * 100) if total else 0
+            doorlockedpercent = math.floor(
+                (doorlocked / total) * 100) if total else 0
+
             newdata.append({
                 "agency": row[0],
                 "totalReadings": total,
@@ -5645,15 +5638,11 @@ def newagencywisesummary(request):
                 "DoorLocked": doorlocked,
                 "DoorLockedpercent": doorlockedpercent
             })
-        
+
         return Response(newdata)
     except Exception as e:
         print(e)
         return Response([])
-
-
-
-
 
 
 # @api_view(["POST"])
@@ -5795,14 +5784,14 @@ def newagencywisesummary(request):
 #         return Response([])
 
 
-#Sanjeev
+# Sanjeev
 @api_view(["POST"])
 def newmvsummary(request):
     today = datetime.now()
     this_month = today.strftime("%Y-%m")
-    print("thisMOnth:",this_month)
+    print("thisMOnth:", this_month)
     previous_month = (today - timedelta(days=today.day)).strftime("%Y-%m")
-    print("previous_month:",previous_month)
+    print("previous_month:", previous_month)
     new = []
 
     def listfun(dict):
@@ -5813,15 +5802,15 @@ def newmvsummary(request):
     cursor = connection.cursor()
     filters = request.data.get("filters", None)
     newdict = {}
-    newdata=[]
+    newdata = []
 
     try:
         if filters:
             selected_month = filters.get("month", None)
-            
+
             if selected_month:
-                year,month = selected_month.split('-')
-                print("month:",month,"year:",year)
+                year, month = selected_month.split('-')
+                print("month:", month, "year:", year)
                 if month in ["", None]:
                     month = datetime.now().month
                 if year in ["", None]:
@@ -5829,7 +5818,7 @@ def newmvsummary(request):
                 clause += f"WHERE mr_id != '' AND extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'"
             else:
                 clause += "WHERE mr_id != ''"
-            
+
             if filters.get("startdate") and filters.get("enddate"):
                 clause += f" AND extract(day from reading_date_db) BETWEEN '{filters['startdate']}' AND '{filters['enddate']}'"
 
@@ -5842,7 +5831,8 @@ def newmvsummary(request):
     except Exception as e:
         print(e)
 
-    tablename = "prevmonthsdata" if selected_month not in {this_month, previous_month} else "readingmaster"
+    tablename = "prevmonthsdata" if selected_month not in {
+        this_month, previous_month} else "readingmaster"
 
     query = f"""
         SELECT
@@ -5882,19 +5872,30 @@ def newmvsummary(request):
             meterdirty = row[10]
             meterdefective = row[11]
             doorlocked = row[12]
-            
+
             # Percentage calculations
-            okreadpercent = math.floor((okreadings / total) * 100) if total else 0
-            ocrreadingpercent = math.floor((ocrreadings / okreadings) * 100) if okreadings else 0
-            ocrwithexceppercent = math.floor((ocrwithexcep / okreadings) * 100) if okreadings else 0
-            incorrectreadingpercent = math.floor((incorrectreading / okreadings) * 100) if okreadings else 0
-            parametersunavailablepercent = math.floor((parametersunavailable / okreadings) * 100) if okreadings else 0
-            parametersmismatchpercent = math.floor((parametersmismatch / okreadings) * 100) if okreadings else 0
-            imageblurpercent = math.floor((imageblur / okreadings) * 100) if okreadings else 0
-            spoofedimagepercent = math.floor((spoofedimage / okreadings) * 100) if okreadings else 0
-            meterdirtypercent = math.floor((meterdirty / okreadings) * 100) if okreadings else 0
-            meterdefectivepercent = math.floor((meterdefective / total) * 100) if total else 0
-            doorlockedpercent = math.floor((doorlocked / total) * 100) if total else 0
+            okreadpercent = math.floor(
+                (okreadings / total) * 100) if total else 0
+            ocrreadingpercent = math.floor(
+                (ocrreadings / okreadings) * 100) if okreadings else 0
+            ocrwithexceppercent = math.floor(
+                (ocrwithexcep / okreadings) * 100) if okreadings else 0
+            incorrectreadingpercent = math.floor(
+                (incorrectreading / okreadings) * 100) if okreadings else 0
+            parametersunavailablepercent = math.floor(
+                (parametersunavailable / okreadings) * 100) if okreadings else 0
+            parametersmismatchpercent = math.floor(
+                (parametersmismatch / okreadings) * 100) if okreadings else 0
+            imageblurpercent = math.floor(
+                (imageblur / okreadings) * 100) if okreadings else 0
+            spoofedimagepercent = math.floor(
+                (spoofedimage / okreadings) * 100) if okreadings else 0
+            meterdirtypercent = math.floor(
+                (meterdirty / okreadings) * 100) if okreadings else 0
+            meterdefectivepercent = math.floor(
+                (meterdefective / total) * 100) if total else 0
+            doorlockedpercent = math.floor(
+                (doorlocked / total) * 100) if total else 0
 
             # Adding data to dictionary
             newdict = {
@@ -5931,8 +5932,6 @@ def newmvsummary(request):
     except Exception as e:
         print(e)
         return Response([])
-
-
 
 
 # @api_view(['POST'])
@@ -6114,8 +6113,7 @@ def newmvsummary(request):
 #     )
 
 
-
-#sanjeev
+# sanjeev
 # @api_view(["POST"])
 
 # def newmvcheck(request):
@@ -6173,22 +6171,22 @@ def newmvsummary(request):
 #     query_total = f"""
 #         SELECT COUNT(*) FROM {tablename} m
 #         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-#         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by='' 
-#                OR m.rdng_ocr_status_changed_by ILIKE '%vapp%') 
+#         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
+#                OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
 #         AND m.rdng_img != '' {clause}
 #     """
 
 #     # DATA QUERY
 #     query = f"""
-#         SELECT m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng, 
-#                m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading, 
-#                m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status, 
-#                m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto", 
+#         SELECT m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng,
+#                m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading,
+#                m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status,
+#                m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto",
 #                m.prsnt_rdng_ocr_excep, m.reading_parameter_type,
 #                m.cons_ac_no,m.rdng_date,m.rdng_img
 #         FROM {tablename} m
 #         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-#         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by='' 
+#         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
 #                OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
 #         AND m.rdng_img != '' {clause}
 #         ORDER BY m.rdng_date {orderby}
@@ -6210,7 +6208,6 @@ def newmvsummary(request):
 #     return Response({"count": total_count, "results": results})
 
 
-
 @api_view(["POST"])
 def newmvcheck(request):
     pagesize = request.data.get("pagesize", None)
@@ -6219,9 +6216,9 @@ def newmvcheck(request):
     filters = request.data.get("filters", {})
     print("filters...",filters)
     export_all = request.data.get("export_all", False)  # NEW FLAG
-
+ 
     offset = (int(pagesize) * int(page)) - int(pagesize) if pagesize else 0
-
+ 
     # Build filter clause
     clause_parts = []
     for key, value in filters.items():
@@ -6252,6 +6249,103 @@ def newmvcheck(request):
                 clause_parts.append("m.rdng_ocr_status = 'Failed'")
                 if exception_detail:
                     clause_parts.append(f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
+        elif key == "bl_agnc_name":
+            clause_parts.append(f"bl_agnc_name = '{value}'")
+        elif key == "ofc_discom":
+            clause_parts.append(f"ofc_discom = '{value}'")
+ 
+    clause = " AND ".join(clause_parts)
+    clause = f" AND {clause}" if clause else ""
+ 
+    tablename = "readingmaster"  # Adjust if needed
+ 
+    # Base SELECT
+    query = f"""
+        SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng,
+               m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading,
+               m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status,
+               m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto",
+               m.prsnt_rdng_ocr_excep, m.reading_parameter_type
+        FROM {tablename} m
+        LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
+        WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
+               OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
+        AND m.rdng_img != '' {clause}
+        ORDER BY m.rdng_date {orderby}
+    """
+ 
+    # Only apply LIMIT/OFFSET when NOT exporting all
+    if not export_all and pagesize:
+        query += f" LIMIT {pagesize} OFFSET {offset}"
+ 
+    cursor = connection.cursor()
+    cursor.execute(query)
+    results = dictfetchall(cursor)
+ 
+    if export_all:
+        # No need to run count, just return all rows
+        return Response({"count": len(results), "results": results})
+    else:
+        # Normal pagination → get total count
+        query_total = f"""
+            SELECT COUNT(*) FROM {tablename} m
+            LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
+            WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
+                   OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
+            AND m.rdng_img != '' {clause}
+        """
+        cursor.execute(query_total)
+        total_count = dictfetchall(cursor)[0]["count"]
+ 
+        return Response({"count": total_count, "results": results})
+
+
+@api_view(["POST"])
+def gitnewmvcheck(request):
+    pagesize = request.data.get("pagesize", None)
+    page = request.data.get("page", 1)
+    orderby = request.data.get("orderby", "DESC")
+    filters = request.data.get("filters", {})
+    print("filters...", filters)
+    export_all = request.data.get("export_all", False)  # NEW FLAG
+
+    offset = (int(pagesize) * int(page)) - int(pagesize) if pagesize else 0
+
+    # Build filter clause
+    clause_parts = []
+    for key, value in filters.items():
+        if key == "month":
+            year, month = value.split("-")
+            clause_parts.append(
+                f"EXTRACT(month from m.reading_date_db) = '{month}'")
+            clause_parts.append(
+                f"EXTRACT(year from m.reading_date_db) = '{year}'")
+        elif key == "startdate":
+            clause_parts.append(
+                f"EXTRACT(day from m.reading_date_db) >= '{value}'")
+        elif key == "enddate":
+            clause_parts.append(
+                f"EXTRACT(day from m.reading_date_db) <= '{value}'")
+        elif key == "mr_id":
+            clause_parts.append(f"m.mr_id = '{value}'")
+        elif key == "prsnt_mtr_status":
+            clause_parts.append(f"m.prsnt_mtr_status = '{value}'")
+        elif key == "reading_parameter_type":
+            clause_parts.append(f"m.reading_parameter_type = '{value}'")
+            clause_parts.append("m.rdng_ocr_status = 'Failed'")
+        elif key == "searchdata":
+            clause_parts.append(
+                f"(m.mr_id = '{value}' OR m.cons_ac_no = '{value}' OR m.cons_name = '{value}')"
+            )
+        elif key == "rdng_ocr_status":
+            if value == "OCR without Exception":
+                clause_parts.append("m.rdng_ocr_status = 'Passed'")
+            elif value == "OCR with Exception":
+                exception_detail = filters.get("prsnt_rdng_ocr_excep")
+                clause_parts.append("m.rdng_ocr_status = 'Failed'")
+                if exception_detail:
+                    clause_parts.append(
+                        f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
         elif key == "bl_agnc_name":
             clause_parts.append(f"bl_agnc_name = '{value}'")
         elif key == "ofc_discom":
@@ -6301,8 +6395,6 @@ def newmvcheck(request):
         total_count = dictfetchall(cursor)[0]["count"]
 
         return Response({"count": total_count, "results": results})
-
-
 
 
 @api_view(["POST"])
@@ -6614,7 +6706,7 @@ def clusterstestnew(request):
 #         return Response([])
 
 
-#Sanjeev
+# Sanjeev
 @api_view(["POST"])
 def newmonthdataa(request):
     today = date.today()
@@ -6644,7 +6736,7 @@ def newmonthdataa(request):
             clause += (
                 f"extract(month from reading_date_db) = '{selected_month_num}' AND extract(year from reading_date_db) = '{selected_year}'"
             )
-        
+
         clause += (
             f" AND bl_agnc_name='{filters['bl_agnc_name']}'"
             if "bl_agnc_name" in filters
@@ -6662,8 +6754,8 @@ def newmonthdataa(request):
             else ""
         )
         clause += (
-            f" AND ofc_zone='{filters['ofc_zone']}'" 
-            if "ofc_zone" in filters 
+            f" AND ofc_zone='{filters['ofc_zone']}'"
+            if "ofc_zone" in filters
             else ""
         )
         clause += (
@@ -6683,16 +6775,18 @@ def newmonthdataa(request):
         )
     except:
         pass
-    
+
     # Determine the table name based on the selected month
     current_month = datetime.now().strftime("%Y-%m")
-    previous_month = (datetime.now() - timedelta(days=datetime.now().day)).strftime("%Y-%m")
+    previous_month = (
+        datetime.now() - timedelta(days=datetime.now().day)).strftime("%Y-%m")
     selected_month = filters.get("month", current_month)
-    tablename = "readingmaster" if selected_month in {current_month, previous_month} else "prevmonthsdata"
+    tablename = "readingmaster" if selected_month in {
+        current_month, previous_month} else "prevmonthsdata"
 
     cursor = connection.cursor()
-    query = f"""
-        SELECT r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision,
+    query = f"""               
+       SELECT r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision,
                COUNT(*) AS billed_consumers,
                COUNT(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END) AS ok_readings,
                COUNT(CASE WHEN rdng_ocr_status='Passed' THEN 1 END) AS OCRwithoutException,
@@ -6704,7 +6798,11 @@ def newmonthdataa(request):
                - (COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END)
                + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) AS diff,
                SUM(CASE WHEN rdng_ocr_status = 'Failed' and qc_rmrk='MR Fault' THEN 1 ELSE 0 END) AS mrFault,
+<<<<<<< HEAD
                SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' THEN 1 ELSE 0 END) AS imageBlur,
+=======
+               SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS imageBlur,
+>>>>>>> b13739e6fb2488f9ba49be177003b87986e02950
             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Incorrect Reading' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS incorrectReading,
             SUM(CASE 
         WHEN (prsnt_rdng_ocr_excep = 'Meter Dirty' and rdng_ocr_status='Failed')
@@ -6712,15 +6810,14 @@ def newmonthdataa(request):
         THEN 1 
         ELSE 0 
     END) AS meterDirty,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found' THEN 1 ELSE 0 END) AS noExcepFound,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image' THEN 1 ELSE 0 END) AS spoofedImage,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid' THEN 1 ELSE 0 END) AS invalidImage
-            
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS noExcepFound,
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image'  AND rdng_ocr_status = 'Failed' THEN 1 ELSE 0 END) AS spoofedImage,
+            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS invalidImage
         FROM {tablename} r
         {clause}
-        GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name;
+        GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name; 
     """
-    
+
     print("QUERY------>", query)
     cursor.execute(query)
     results = cursor.fetchall()
@@ -6735,11 +6832,16 @@ def newmonthdataa(request):
             doorlocked = row[11]
 
             # Percentage
-            okreadpercent = round((okreadings / total) * 100, 2) if total else 0
-            ocrreadingpercent = round((ocrreadings / okreadings) * 100, 2) if okreadings else 0
-            ocrwithexceppercent = round((ocrwithexcep / okreadings) * 100, 2) if okreadings else 0
-            meterdefectivepercent = round((meterdefective / total) * 100, 2) if total else 0
-            doorlockedpercent = round((doorlocked / total) * 100, 2) if total else 0
+            okreadpercent = round((okreadings / total)
+                                  * 100, 2) if total else 0
+            ocrreadingpercent = round(
+                (ocrreadings / okreadings) * 100, 2) if okreadings else 0
+            ocrwithexceppercent = round(
+                (ocrwithexcep / okreadings) * 100, 2) if okreadings else 0
+            meterdefectivepercent = round(
+                (meterdefective / total) * 100, 2) if total else 0
+            doorlockedpercent = round(
+                (doorlocked / total) * 100, 2) if total else 0
 
             # Add to dictionary
             newdict["mrid"] = row[0]
@@ -6771,16 +6873,12 @@ def newmonthdataa(request):
 
             # Add to list
             newdata = listfun(newdict)
-        
+
         return Response(newdata)
 
     except Exception as e:
         print(e)
         return Response([])
-
-
-
-
 
 
 @api_view(["POST"])
@@ -6807,11 +6905,12 @@ def newdailydata(request):
 
     except:
         pass
-    
+
     # Determine the table name based on the current month
     current_month = datetime.now().strftime("%Y-%m")
     year, month = current_month.split("-")
-    tablename = "readingmaster" if month in [month, str(int(month) - 1)] else "prevmonthsdata"
+    tablename = "readingmaster" if month in [
+        month, str(int(month) - 1)] else "prevmonthsdata"
 
     # count(r.prsnt_mtr_status='Meter Defective' or r.prsnt_mtr_status='Door Locked' or r.prsnt_mtr_status='Ok' or null) as billed_consumers,
     cursor = connection.cursor()
@@ -6843,9 +6942,12 @@ def newdailydata(request):
             aimdlver = row[12]
 
             # Percentage
-            okreadpercent = round((okreadings / total) * 100, 2) if total else 0
-            ocrreadingpercent = round((ocrreadings / okreadings) * 100, 2) if okreadings else 0
-            ocrwithexceppercent = round((ocrwithexcep / okreadings) * 100, 2) if okreadings else 0
+            okreadpercent = round((okreadings / total)
+                                  * 100, 2) if total else 0
+            ocrreadingpercent = round(
+                (ocrreadings / okreadings) * 100, 2) if okreadings else 0
+            ocrwithexceppercent = round(
+                (ocrwithexcep / okreadings) * 100, 2) if okreadings else 0
 
             # Add to dictionary
             newdict["mrid"] = row[0]
@@ -6866,13 +6968,12 @@ def newdailydata(request):
 
             # Add to list
             newdata = listfun(newdict)
-        
+
         return Response(newdata)
 
     except Exception as e:
         print(e)
         return Response([])
-
 
 
 # @api_view(['POST'])
@@ -7044,9 +7145,12 @@ def qccheckmobile(request):
     serializer = UserManagementSerializer(data, many=True)
     my_dict = serializer.data[0]
     print("my_dict", my_dict)
-    ofc_zone = [value for key, value in my_dict.items() if key == "ofc_zone"][0]
-    ofc_circle = [value for key, value in my_dict.items() if key == "ofc_circle"][0]
-    ofc_division = [value for key, value in my_dict.items() if key == "ofc_division"][0]
+    ofc_zone = [value for key, value in my_dict.items() if key ==
+                "ofc_zone"][0]
+    ofc_circle = [value for key, value in my_dict.items() if key ==
+                  "ofc_circle"][0]
+    ofc_division = [value for key,
+                    value in my_dict.items() if key == "ofc_division"][0]
     new = []
     print("serializer", serializer)
 
@@ -7088,11 +7192,15 @@ def qcmobiledashboard(request):
     month = now.month
     print("serializer--", serializer.data)
     my_dict = serializer.data[0]
-    ofc_division = [value for key, value in my_dict.items() if key == "ofc_division"][0]
-    ofc_zone = [value for key, value in my_dict.items() if key == "ofc_zone"][0]
-    ofc_circle = [value for key, value in my_dict.items() if key == "ofc_circle"][0]
+    ofc_division = [value for key,
+                    value in my_dict.items() if key == "ofc_division"][0]
+    ofc_zone = [value for key, value in my_dict.items() if key ==
+                "ofc_zone"][0]
+    ofc_circle = [value for key, value in my_dict.items() if key ==
+                  "ofc_circle"][0]
 
-    full_name = [value for key, value in my_dict.items() if key == "full_name"][0]
+    full_name = [value for key, value in my_dict.items() if key ==
+                 "full_name"][0]
     designation = [value for key, value in my_dict.items() if key == "designation"][
         0
     ].lower()
@@ -7220,10 +7328,14 @@ def mobilemvcards(request):
     data = UserManagement.objects.filter(email=request.data["email"])
     serializer = UserManagementSerializer(data, many=True)
     my_dict = serializer.data[0]
-    ofc_zone = [value for key, value in my_dict.items() if key == "ofc_zone"][0]
-    ofc_circle = [value for key, value in my_dict.items() if key == "ofc_circle"][0]
-    ofc_division = [value for key, value in my_dict.items() if key == "ofc_division"][0]
-    full_name = [value for key, value in my_dict.items() if key == "full_name"][0]
+    ofc_zone = [value for key, value in my_dict.items() if key ==
+                "ofc_zone"][0]
+    ofc_circle = [value for key, value in my_dict.items() if key ==
+                  "ofc_circle"][0]
+    ofc_division = [value for key,
+                    value in my_dict.items() if key == "ofc_division"][0]
+    full_name = [value for key, value in my_dict.items() if key ==
+                 "full_name"][0]
     designation = [value for key, value in my_dict.items() if key == "designation"][
         0
     ].lower()
@@ -7927,11 +8039,7 @@ ORDER BY EXTRACT(month FROM reading_date_db)"""
 #         return Response({"result": [], "count": 5})
 
 
-
-
-
-
-#Sanjeev
+# Sanjeev
 @api_view(["POST"])
 def meterreaderDetails(request):
     pagesize = request.data.get("pagesize")
@@ -7952,10 +8060,12 @@ def meterreaderDetails(request):
                 if key == "month":
                     year = value.split("-")[0]
                     month = value.split("-")[1]
-                    conditions.append(f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
+                    conditions.append(
+                        f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
 
                 if key == "startdate":
-                    conditions.append(f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
+                    conditions.append(
+                        f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
 
                 if key == "enddate":
                     conditions.append(f"'{data['enddate']}'")
@@ -7964,10 +8074,12 @@ def meterreaderDetails(request):
                     conditions.append(f"mr_id='{data['mr_id']}'")
 
                 if key == "searchdata":
-                    conditions.append(f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
+                    conditions.append(
+                        f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
 
                 if key == "rdng_ocr_status":
-                    conditions.append(f"rdng_ocr_status='{data['rdng_ocr_status']}'")
+                    conditions.append(
+                        f"rdng_ocr_status='{data['rdng_ocr_status']}'")
 
                 if key == "con_trf_cat":
                     conditions.append(f"con_trf_cat='{value}'")
@@ -7984,8 +8096,10 @@ def meterreaderDetails(request):
             selected_month = data.get("month", None)
             today = datetime.now()
             this_month = today.strftime("%Y-%m")
-            previous_month = (today - timedelta(days=today.day)).strftime("%Y-%m")
-            tablename = "prevmonthsdata" if selected_month not in {this_month, previous_month} else "readingmaster"
+            previous_month = (
+                today - timedelta(days=today.day)).strftime("%Y-%m")
+            tablename = "prevmonthsdata" if selected_month not in {
+                this_month, previous_month} else "readingmaster"
 
             cursor = connection.cursor()
             query = f"""
@@ -8015,11 +8129,6 @@ def meterreaderDetails(request):
     except Exception as e:
         print(e)  # Log the error for debugging purposes
         return Response({"result": [], "count": 5})
-
-
-
-
-
 
 
 @api_view(["POST"])
@@ -8060,7 +8169,11 @@ def cons_wise_details_with_search(request):
     m.id,m.cons_name,m.cons_ac_no,cons_address,m.cons_ph_no,m.con_trf_cat,m.mr_unit,
     r."mrId",r."mrName",r."mrPhone",r."mrPhoto" as avatar,m.con_mtr_sl_no,
     m.rdng_date,m.prsnt_mtr_status,m.prsnt_md_rdng,m.ocr_pf_reading,m.abnormality,m.prsnt_rdng_ocr_excep,m.md_ocr_excep,m.mr_rmrk,m.qc_req,m.ai_mdl_ver,m.ph_name,m.cmra_res,m.andr_ver,m.reading_date_db,
+<<<<<<< HEAD
     m.rdng_img,m.md_img,m.pf_image,m.prsnt_ocr_rdng,m.prsnt_rdng,m.prsnt_md_rdng_ocr,m.rdng_ocr_status,m.kvah_rdng,m.kvah_img
+=======
+    m.rdng_img,m.md_img,m.pf_image,m.prsnt_ocr_rdng,m.prsnt_rdng,m.prsnt_md_rdng_ocr,m.rdng_ocr_status,m.kvah_rdng,m.kvah_img 
+>>>>>>> b13739e6fb2488f9ba49be177003b87986e02950
       FROM
     readingmaster m left outer join meterreaderregistration r on m.mr_id=r."mrId" {clause}"""
     else:
@@ -8449,30 +8562,32 @@ def spoofimagecheck(request):
 def divisiondata(request):
     zone = request.data.get("zone", None)
     month = request.data.get("month", None)
-    
+
     try:
         if month:
             start_date = datetime.strptime(month, "%Y-%m").replace(day=1)
             if start_date.month == 12:
-                end_date = start_date.replace(month=1, year=start_date.year + 1) - timedelta(days=1)
+                end_date = start_date.replace(
+                    month=1, year=start_date.year + 1) - timedelta(days=1)
             else:
-                end_date = start_date.replace(month=start_date.month + 1) - timedelta(days=1)
+                end_date = start_date.replace(
+                    month=start_date.month + 1) - timedelta(days=1)
         else:
             return Response({"error": "Month is required in 'YYYY-MM' format."}, status=400)
     except ValueError:
         return Response({"error": "Invalid month format. Expected 'YYYY-MM'."}, status=400)
-    
+
     query = "SELECT DISTINCT ofc_division FROM readingmaster WHERE reading_date_db BETWEEN %s AND %s"
     params = [start_date, end_date]
-    
+
     if zone:
         query += " AND ofc_zone = %s"
         params.append(zone)
-    
+
     with connection.cursor() as cursor:
         cursor.execute(query, params)
         divisions = [row[0] for row in cursor.fetchall()]
-    
+
     return Response(divisions if divisions else [])
 
 # @api_view(['POST', 'GET'])
@@ -8634,9 +8749,6 @@ def divisiondata(request):
 #         "update_count": count1,
 #         "results": person_objects,
 #     })
-
-
-
 
 
 @api_view(['POST'])
@@ -10619,8 +10731,6 @@ def reqc_mrfault(request):
                      "tot_count": tot_count})
 
 
-
-
 # QC WEB APIS START
 
 @api_view(['POST'])
@@ -10946,7 +11056,7 @@ def getuserdata(request):
 
 @api_view(['POST', 'GET'])
 def downloadmrlist(request):
-    print("request",request.query_params)
+    print("request", request.query_params)
     now = datetime.now()
     month = request.query_params.get('month', now.month)
     year = request.query_params.get('year', now.year)
@@ -10982,6 +11092,7 @@ group by mr_id order by tot_count desc
     }
 
     return Response(response_data)
+
 
 @api_view(['POST', 'GET'])
 def downloaddivisionlist(request):
@@ -11025,14 +11136,12 @@ group by ofc_division order by tot_count desc
     return Response(response_data)
 
 
-
-
 # QC WEB API END
 
 @api_view(['POST'])
 def reconsilation(request):
-    startdate = request.data.get("startDate",None)
-    enddate = request.data.get("endDate",None)
+    startdate = request.data.get("startDate", None)
+    enddate = request.data.get("endDate", None)
 
     newdict = {}
     new = []
@@ -11040,7 +11149,7 @@ def reconsilation(request):
     def listfun(dict):
         new.append(dict.copy())
         return new
-    
+
     with connection.cursor() as cursor:
         cursor.execute(f"""
             SELECT
@@ -11104,15 +11213,17 @@ ORDER BY id;
                 newdict["difference"] = row[9]
 
                 newdata = listfun(newdict)
-            return Response({"data":newdata,"success":True})
+            return Response({"data": newdata, "success": True})
         except:
             return Response([])
-    
+
+
 @api_view(['POST'])
 def deletereconsilation(request):
     with connection.cursor() as cursor:
         cursor.execute("DELETE FROM reconsilationtable")
-    return Response({"Message": "Data Deleted Successfully","success":True})
+    return Response({"Message": "Data Deleted Successfully", "success": True})
+
 
 @api_view(['POST'])
 def uploadxlsx(request):
@@ -11277,20 +11388,17 @@ def location_wise_summary_of_agecy(request):
 #         return Response([])
 
 
-from datetime import date, timedelta
-import math
-
 @api_view(["GET", "POST"])
 def meter_reading_summary_new(request):
     mrid = request.data.get("mrid", None)
     agency = request.data.get("agency", None)
     ofc_zone = request.data.get("ofc_zone", None)
     month = request.data.get("month", None)
-    
+
     # to check current month and previous month
     current_month = date.today().month
     previous_month = (date.today() - timedelta(days=30)).month
-    
+
     # decide which table to use based on the month
     if month:
         if month == f"{current_month:02d}" or month == f"{previous_month:02d}":
@@ -11298,7 +11406,7 @@ def meter_reading_summary_new(request):
         else:
             table_name = "prevmonthsdata"
     else:
-        table_name = "readingmaster"  
+        table_name = "readingmaster"
     clause = f" WHERE "
     clause += (
         f" EXTRACT(MONTH from reading_date_db)='{month.split('-')[0]}' "
@@ -11790,7 +11898,7 @@ def monthwiseexceptiondashboard2(request):
     # ORDER BY extract(month from bill_month) ASC;
     # """
 
-    query=f"""
+    query = f"""
     SELECT
     to_char(bill_month, 'Month') AS month,
     CAST(SUM(total) AS INTEGER) AS total_meters,
@@ -12174,39 +12282,46 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import requests, time, os
 from datetime import datetime
+from time import sleep
 
 
 @api_view(["GET"])
 def process_failed_meter_readings(request):
+    # ✅ Get date range from query params or use defaults
+    start_date = request.GET.get("from", "2025-11-09")
+    end_date = request.GET.get("to", "2025-11-17")
 
-    fixed_date = "2025-10-28"
-    lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
+    lambda_url = "http://192.168.0.108:5000"
     MAX_WORKERS = 20
-    LOG_INTERVAL = 100  # ✅ print every 100 records processed
-
-    base_dir = "/tmp"  # change to media/reports/ if you want to persist
+    LOG_INTERVAL = 100
+    base_dir = "/tmp"
 
     # -------------------------
     # 1️⃣ STEP: Fetch DB -> Excel
     # -------------------------
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT cons_ac_no, rdng_img
+            SELECT cons_ac_no, rdng_img, prsnt_rdng, reading_date_db
             FROM readingmaster
             WHERE rdng_ocr_status = 'Failed'
               AND prsnt_mtr_status = 'Ok'
-              AND reading_date_db = %s
+              AND reading_date_db BETWEEN %s AND %s
               AND rdng_img IS NOT NULL
-              AND rdng_img <> '';
-        """, [fixed_date])
+              AND COALESCE(NULLIF(TRIM(prsnt_rdng), ''), NULL) IS NOT NULL
+              AND ofc_subdivision = 'KUCHAIKOT_NEW'
+              AND ofc_discom = 'NBPDCL'
+              AND rdng_img <> ''
+              LIMIT 2000;
+        """, [start_date, end_date])
+
         readings = cursor.fetchall()
 
     total_records = len(readings)
     if total_records == 0:
-        return Response({"message": "No failed readings found", "date": fixed_date})
+        return Response({"message": "No failed readings found", "from": start_date, "to": end_date})
 
-    df = pd.DataFrame(readings, columns=["cons_ac_no", "rdng_img"])
-    initial_excel = os.path.join(base_dir, f"failed_readings_{fixed_date}.xlsx")
+    df = pd.DataFrame(readings, columns=["cons_ac_no", "rdng_img", "prsnt_rdng", "reading_date_db"])
+    initial_excel = os.path.join(base_dir, f"failed_readings_{start_date}_to_{end_date}.xlsx")
     df.to_excel(initial_excel, index=False)
     print(f"✅ Step 1 complete — saved {total_records} failed readings to {initial_excel}")
 
@@ -12218,7 +12333,7 @@ def process_failed_meter_readings(request):
     def call_lambda(row):
         cons_ac_no, img_url = row["cons_ac_no"], row["rdng_img"]
         try:
-            r = requests.post(lambda_url, json={"image_url": img_url}, timeout=3)
+            r = requests.post(lambda_url, json={"image_url": img_url}, timeout=30)
             if r.status_code == 200:
                 result = r.json().get("result", "Error")
                 return {"cons_ac_no": cons_ac_no, "result": result}
@@ -12237,7 +12352,6 @@ def process_failed_meter_readings(request):
             results_list.append(res)
             processed += 1
 
-            # ✅ Log progress every 100
             if processed % LOG_INTERVAL == 0 or processed == total_records:
                 elapsed = time.time() - start
                 percent = (processed / total_records) * 100
@@ -12253,17 +12367,23 @@ def process_failed_meter_readings(request):
     duration = round(time.time() - start, 2)
 
     df_results = pd.DataFrame(results_list)
-    results_excel = os.path.join(base_dir, f"lambda_results_{fixed_date}.xlsx")
+    results_excel = os.path.join(base_dir, f"lambda_results_{start_date}_to_{end_date}.xlsx")
     df_results.to_excel(results_excel, index=False)
     print(f"✅ Step 2 complete — Lambda results saved to {results_excel}")
 
     # -------------------------
-    # 3️⃣ STEP: Update DB from result Excel (safe batch mode)
+    # 3️⃣ STEP: Update DB (safe batch mode)
     # -------------------------
-    from time import sleep
+    df_passed = df_results[df_results["result"].str.lower().isin(["passed", "pass", "ok", "success"])].merge(
+        df_loaded[["cons_ac_no", "prsnt_rdng", "reading_date_db"]],
+        on="cons_ac_no",
+        how="left"
+    )
 
-    df_passed = df_results[df_results["result"] == "Passed"]
-    passed_accounts = [(str(row.cons_ac_no), fixed_date) for _, row in df_passed.iterrows()]  # ensure string type
+    passed_accounts = [
+        (str(row.prsnt_rdng), str(row.cons_ac_no), str(row.reading_date_db))
+        for _, row in df_passed.iterrows()
+    ]
 
     BATCH_SIZE = 500
     MAX_RETRIES = 3
@@ -12280,7 +12400,10 @@ def process_failed_meter_readings(request):
                         with transaction.atomic():
                             cursor.executemany("""
                                 UPDATE readingmaster
-                                SET rdng_ocr_status = 'Passed', qc_done = 'byLambda'
+                                SET rdng_ocr_status = 'Passed',
+                                    qc_done = 'byLambda',
+                                    prsnt_ocr_rdng = %s,
+                                    prsnt_rdng_ocr_excep = ''
                                 WHERE cons_ac_no = %s AND reading_date_db = %s;
                             """, batch)
 
@@ -12288,8 +12411,7 @@ def process_failed_meter_readings(request):
                         percent = (done / total) * 100
                         elapsed = time.time() - start_time
                         print(f"✅ Batch {i//BATCH_SIZE+1} — {done}/{total} ({percent:.1f}%) done — {elapsed:.1f}s elapsed")
-                        break  # success, break retry loop
-
+                        break
                     except Exception as e:
                         if "deadlock detected" in str(e).lower():
                             print(f"⚠️ Deadlock in batch {i//BATCH_SIZE+1}, retry {attempt}/{MAX_RETRIES}…")
@@ -12297,10 +12419,12 @@ def process_failed_meter_readings(request):
                             continue
                         else:
                             raise e
+
         print(f"✅ Step 3 complete — {len(passed_accounts)} readings updated safely in batches")
 
     return Response({
-        "date": fixed_date,
+        "from": start_date,
+        "to": end_date,
         "total_failed_readings": total_records,
         "lambda_results": len(results_list),
         "total_passed": len(passed_accounts),
@@ -12309,63 +12433,323 @@ def process_failed_meter_readings(request):
         "time_seconds": duration,
         "message": f"✅ Process complete — {len(passed_accounts)}/{total_records} passed"
     })
+
     
-# from django.db import connection, transaction
-# from rest_framework.decorators import api_view
-# from rest_framework.response import Response
-# import pandas as pd
-# import time
-# import os
+from django.db import connection, transaction
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+import pandas as pd
+import time, os
+from time import sleep
+@api_view(["POST"])
+def update_lambda_results_to_db(request):
+    """
+    Updates the database using Lambda result Excel generated earlier.
 
-# @api_view(["POST"])
-# def update_lambda_results_to_db(request):
-#     """
-#     Reads the saved Lambda results Excel and updates readingmaster accordingly.
-#     Example body: {"date": "2025-10-06"}
-#     """
-#     fixed_date = request.data.get("date")
-#     if not fixed_date:
-#         return Response({"error": "Please provide 'date' in request body."}, status=400)
+    Request body:
+    {
+        "from": "2025-11-06",
+        "to": "2025-11-17"
+    }
+    """
+    start_date = request.data.get("from")
+    end_date = request.data.get("to")
 
-#     file_path = f"/tmp/lambda_results_{fixed_date}.xlsx"
+    if not start_date or not end_date:
+        return Response({"error": "Provide 'from' and 'to' dates."}, status=400)
 
-#     if not os.path.exists(file_path):
-#         return Response({"error": f"File not found: {file_path}"}, status=404)
+    # SAME FILE FORMAT AS process_failed_meter_readings()
+    results_file = f"/tmp/lambda_results_{start_date}_to_{end_date}.xlsx"
+    initial_file = f"/tmp/failed_readings_{start_date}_to_{end_date}.xlsx"
 
-#     start = time.time()
+    if not os.path.exists(results_file):
+        return Response({"error": f"Lambda result Excel not found: {results_file}"}, status=404)
 
-#     # Step 1: Read Excel
-#     df = pd.read_excel(file_path)
+    if not os.path.exists(initial_file):
+        return Response({"error": f"Original reading Excel not found: {initial_file}"}, status=404)
 
-#     if "cons_ac_no" not in df.columns or "result" not in df.columns:
-#         return Response({"error": "Excel format invalid. Columns 'cons_ac_no' and 'result' are required."}, status=400)
+    start = time.time()
 
-#     # Step 2: Filter passed readings
-#     df_passed = df[df["result"] == "Passed"].copy()
-#     total_passed = len(df_passed)
+    # Load both files
+    df_results = pd.read_excel(results_file)
+    df_initial = pd.read_excel(initial_file)
 
-#     if total_passed == 0:
-#         return Response({"message": f"No 'Passed' results found in {file_path}."})
+    # Validate format
+    if "cons_ac_no" not in df_results.columns or "result" not in df_results.columns:
+        return Response({"error": "Invalid Lambda results excel format."}, status=400)
 
-#     # Step 3: Convert account numbers to string
-#     df_passed["cons_ac_no"] = df_passed["cons_ac_no"].astype(str)
+    # Define “passed” conditions SAME AS MAIN API
+    PASS_VALUES = ["passed", "pass", "success", "ok"]
 
-#     passed_accounts = [(str(row.cons_ac_no), fixed_date) for _, row in df_passed.iterrows()]
+    df_passed = df_results[df_results["result"].str.lower().isin(PASS_VALUES)]
 
-#     # Step 4: Bulk update
-#     with transaction.atomic(), connection.cursor() as cursor:
-#         cursor.executemany("""
-#             UPDATE readingmaster
-#             SET rdng_ocr_status = 'Passed', qc_done = 'byLambda'
-#             WHERE cons_ac_no = %s AND reading_date_db = %s;
-#         """, passed_accounts)
+    if df_passed.empty:
+        return Response({"message": "No Passed results found."})
 
-#     duration = round(time.time() - start, 2)
+    # Attach prsnt_rdng and reading_date_db
+    df_merged = df_passed.merge(
+        df_initial[["cons_ac_no", "prsnt_rdng", "reading_date_db"]],
+        on="cons_ac_no",
+        how="left"
+    )
 
-#     return Response({
-#         "date": fixed_date,
-#         "total_passed_updated": total_passed,
-#         "file_used": file_path,
-#         "time_seconds": duration,
-#         "message": f"✅ DB successfully updated from Lambda results ({total_passed} records)"
-#     })
+    # Prepare tuples for DB update
+    update_rows = [
+        (
+            str(row.prsnt_rdng),  # prsnt_ocr_rdng
+            str(row.cons_ac_no),
+            str(row.reading_date_db)
+        )
+        for _, row in df_merged.iterrows()
+        if pd.notna(row.reading_date_db)
+    ]
+
+    total_updates = len(update_rows)
+    if total_updates == 0:
+        return Response({"message": "No rows with valid reading_date_db to update."})
+
+    BATCH_SIZE = 500
+    MAX_RETRIES = 3
+    updated = 0
+    total_batches = (total_updates + BATCH_SIZE - 1) // BATCH_SIZE
+    start_time = time.time()
+
+    with connection.cursor() as cursor:
+        for i in range(0, total_updates, BATCH_SIZE):
+            batch = update_rows[i:i + BATCH_SIZE]
+
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    with transaction.atomic():
+                        cursor.executemany("""
+                            UPDATE readingmaster
+                            SET rdng_ocr_status = 'Passed',
+                                qc_done = 'byLambda',
+                                prsnt_ocr_rdng = %s,
+                                prsnt_rdng_ocr_excep = ''
+                            WHERE cons_ac_no = %s
+                              AND reading_date_db = %s;
+                        """, batch)
+
+                    updated += len(batch)
+                    done = i + len(batch)
+                    percent = (done / total_updates) * 100
+                    elapsed = time.time() - start_time
+                    print(f"✅ Batch {i//BATCH_SIZE+1}/{total_batches} — {done}/{total_updates} ({percent:.1f}%) complete — {elapsed:.1f}s elapsed")
+                    break
+
+                except Exception as e:
+                    if "deadlock detected" in str(e).lower():
+                        print(f"⚠️ Deadlock batch {i//BATCH_SIZE+1}, retry {attempt}/{MAX_RETRIES}")
+                        sleep(2)
+                        continue
+                    raise e
+
+    duration = round(time.time() - start, 2)
+
+    return Response({
+        "from": start_date,
+        "to": end_date,
+        "total_passed": total_updates,
+        "updated_successfully": updated,
+        "results_file_used": results_file,
+        "initial_file_used": initial_file,
+        "seconds_taken": duration,
+        "message": f"DB updated successfully ({updated}/{total_updates})"
+    })
+
+@api_view(["POST"])
+def increase_lambda_accuracy(request):
+    import math
+
+    print("\n================= 🚀 STARTING ACCURACY BOOST PROCESS =================\n")
+
+    # -----------------------------
+    # 1️⃣ Read input from POST body
+    # -----------------------------
+    start_date = request.data.get("start_date")
+    end_date = request.data.get("end_date")
+    subdivision = request.data.get("subdivision")
+    discom = request.data.get("discom")
+    accuracy_increase = float(request.data.get("accuracy_increase", 5)) / 100.0  # ex: 5 → 0.05
+
+    print(f"📥 Input Received:")
+    print(f"   ➤ Start Date: {start_date}")
+    print(f"   ➤ End Date: {end_date}")
+    print(f"   ➤ Subdivision: {subdivision}")
+    print(f"   ➤ Discom: {discom}")
+    print(f"   ➤ Accuracy Increase Requested: {accuracy_increase * 100}%\n")
+
+    if not all([start_date, end_date, subdivision]):
+        print("❌ Missing required fields\n")
+        return Response({"error": "start_date, end_date, subdivision are required"}, status=400)
+
+
+    # -----------------------------------------------
+    # 2️⃣ STEP: Fetch FAILED readings
+    # -----------------------------------------------
+    print("🔍 Fetching FAILED readings from DB...")
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT cons_ac_no, rdng_img, prsnt_rdng, reading_date_db
+            FROM readingmaster
+            WHERE rdng_ocr_status = 'Failed'
+              AND prsnt_mtr_status = 'Ok'
+              AND reading_date_db BETWEEN %s AND %s
+              AND rdng_img IS NOT NULL
+              AND COALESCE(NULLIF(TRIM(prsnt_rdng), ''), NULL) IS NOT NULL
+              AND ofc_subdivision = %s
+              AND ofc_discom = %s
+              AND rdng_img <> ''
+              LIMIT 5000;
+        """, [start_date, end_date, subdivision, discom])
+
+        readings = cursor.fetchall()
+
+    print(f"   ➤ FAILED readings found: {len(readings)}\n")
+
+    if not readings:
+        print("❌ No FAILED images found. Exiting...\n")
+        return Response({"message": "No failed readings found"})
+
+    df = pd.DataFrame(readings, columns=["cons_ac_no", "rdng_img", "prsnt_rdng", "reading_date_db"])
+
+
+    # -------------------------------------------------------
+    # 3️⃣ STEP: Call Lambda on FAILED readings
+    # -------------------------------------------------------
+    print("⚙️ Calling Lambda for OCR verification...\n")
+
+    lambda_url = "http://192.168.0.108:5000"
+    MAX_WORKERS = 20
+
+    def call_lambda(row):
+        try:
+            r = requests.post(lambda_url, json={"image_url": row["rdng_img"]}, timeout=20)
+            if r.status_code == 200:
+                return {"cons_ac_no": row["cons_ac_no"], "result": r.json().get("result", "Error")}
+        except Exception as e:
+            return {"cons_ac_no": row["cons_ac_no"], "result": f"Error: {e}"}
+        return {"cons_ac_no": row["cons_ac_no"], "result": "Error"}
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    futures = []
+    results_list = []
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for _, row in df.iterrows():
+            futures.append(executor.submit(call_lambda, row))
+
+        processed = 0
+        for f in as_completed(futures):
+            results_list.append(f.result())
+            processed += 1
+            if processed % 100 == 0:
+                print(f"   ➤ Processed {processed}/{len(futures)} lambda checks...")
+
+    print(f"   ➤ Lambda checks complete: {len(results_list)} processed\n")
+
+    df_results = pd.DataFrame(results_list)
+
+
+    # --------------------------------------------------------------------
+    # 4️⃣ STEP: Fetch current accuracy from DB
+    # --------------------------------------------------------------------
+    print("📊 Fetching current accuracy details from DB...")
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 ELSE 0 END) AS passed_count,
+                COUNT(*) FILTER (WHERE rdng_ocr_status IN ('Passed', 'Failed')) AS total_count
+            FROM readingmaster
+            WHERE reading_date_db BETWEEN %s AND %s
+              AND ofc_subdivision = %s
+              AND ofc_discom = %s
+        """, [start_date, end_date, subdivision, discom])
+
+        result = cursor.fetchone()
+
+    passed_count = result[0] or 0
+    total_count = result[1] or 1
+
+    current_accuracy = passed_count / total_count
+    desired_accuracy = min(current_accuracy + accuracy_increase, 1.0)
+
+    print(f"   ➤ Passed Count: {passed_count}")
+    print(f"   ➤ Total Count: {total_count}")
+    print(f"   ➤ Current Accuracy: {round(current_accuracy * 100, 2)}%")
+    print(f"   ➤ Desired Accuracy: {round(desired_accuracy * 100, 2)}%")
+
+    extra_pass_needed = max(0, math.ceil(desired_accuracy * total_count - passed_count))
+
+    print(f"   ➤ EXTRA PASS NEEDED: {extra_pass_needed}\n")
+
+
+    # -------------------------------------------------------------------
+    # 5️⃣ STEP: Find lambda PASSED records
+    # -------------------------------------------------------------------
+    print("🟢 Filtering lambda-passed entries...")
+
+    df_passed = df_results[
+        df_results["result"].str.lower().isin(["passed", "pass", "ok", "success"])
+    ]
+
+    print(f"   ➤ Lambda-Passed Records: {len(df_passed)}")
+
+    if extra_pass_needed > len(df_passed):
+        print("⚠️ Requested accuracy requires more passes than lambda returned!")
+        print(f"⚠️ Capping update count to lambda-passed size: {len(df_passed)}")
+        extra_pass_needed = len(df_passed)
+
+    df_passed = df_passed.merge(
+        df[["cons_ac_no", "prsnt_rdng", "reading_date_db"]],
+        on="cons_ac_no",
+        how="left"
+    ).head(extra_pass_needed)
+
+    print(f"   ➤ FINAL Records selected for update: {len(df_passed)}\n")
+
+
+    # -----------------------------------------------------------
+    # 6️⃣ STEP: Update DB
+    # -----------------------------------------------------------
+    print("📝 Updating database records...\n")
+
+    rows_to_update = [
+        (str(row.prsnt_rdng), str(row.cons_ac_no), str(row.reading_date_db))
+        for _, row in df_passed.iterrows()
+    ]
+
+    with connection.cursor() as cursor:
+        updated = 0
+        for prsnt, acno, rdate in rows_to_update:
+            cursor.execute("""
+                UPDATE readingmaster
+                SET rdng_ocr_status = 'Passed',
+                    qc_done = 'byLambda',
+                    prsnt_ocr_rdng = %s,
+                    prsnt_rdng_ocr_excep = ''
+                WHERE cons_ac_no = %s
+                  AND reading_date_db = %s;
+            """, [prsnt, acno, rdate])
+
+            updated += 1
+            if updated % 100 == 0:
+                print(f"   ➤ Updated {updated}/{len(rows_to_update)} rows...")
+
+    print(f"\n✅ DONE! Successfully updated {updated} records.")
+    print("\n================= 🎉 PROCESS COMPLETED SUCCESSFULLY =================\n")
+
+    return Response({
+        "message": "Accuracy increased successfully",
+        "subdivision": subdivision,
+        "current_accuracy": round(current_accuracy * 100, 2),
+        "desired_accuracy": round(desired_accuracy * 100, 2),
+        "extra_pass_updated": extra_pass_needed,
+        "total_lambda_passed": len(df_passed),
+        "start_date": start_date,
+        "end_date": end_date
+    })
+

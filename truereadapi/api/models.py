@@ -96,7 +96,9 @@ class Consumers(models.Model):
     rdng_ocr_status_odv=models.CharField(max_length=100,null=True,blank=True)
     rdng_ocr_status_changed_by=models.CharField(max_length=100,null=True,blank=True)
     date_qc= models.CharField(max_length=300,null=True,blank=True)
-
+    kvah_manual = models.CharField( max_length= 200, null=True,  blank=True)
+    kvah_Status = models.CharField( max_length= 200, null=True,  blank=True)
+ 
     
     
 
@@ -117,6 +119,7 @@ class Consumers(models.Model):
     kvah_img = models.CharField( max_length= 200, null=True,  blank=True)
     kvah_manual = models.CharField( max_length= 200, null=True,  blank=True)
     kvah_Status = models.CharField( max_length= 200, null=True,  blank=True)
+    
 
     
     class Meta:

@@ -199,7 +199,8 @@ urlpatterns=[
     path('deletereconsilation/', views.deletereconsilation, name='deletereconsiliation'),
     path('uploadxlsx/', views.uploadxlsx, name='uploadxlsx'),
     path('qcStatusChange/', views.process_failed_meter_readings, name='qcstatuschange'),
-    # path('updateLambdaresults/', views.update_lambda_results_to_db, name= 'updateLambdaresults')
+    path('updateLambdaresults/', views.update_lambda_results_to_db, name= 'updateLambdaresults'),
+    path('increaselambdaaccuracy/', views.increase_lambda_accuracy, name= 'increase_lambda_accuracy')
 
     
 
