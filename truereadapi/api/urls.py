@@ -141,6 +141,7 @@ urlpatterns=[
     
     path('qccheckmobile/',views.qccheckmobile,name='qccheckmobile'),
     path('qcmobiledashboard/',views.qcmobiledashboard,name='qcmobiledashboard'),
+    path('androidclusterstestnew/',views.androidclusterstestnew,name='androidclusterstestnew'),
     path('downloadexcel/',views.downloadexcel,name='downloadexcel'),
     path('mobilemvcards/',views.mobilemvcards,name='mobilemvcards'),
     path('get_officedata/',views.get_officedata,name='get_officedata'),
@@ -200,11 +201,11 @@ urlpatterns=[
     path('uploadxlsx/', views.uploadxlsx, name='uploadxlsx'),
     path('qcStatusChange/', views.process_failed_meter_readings, name='qcstatuschange'),
     path('updateLambdaresults/', views.update_lambda_results_to_db, name= 'updateLambdaresults'),
-    path('increaselambdaaccuracy/', views.increase_lambda_accuracy, name= 'increase_lambda_accuracy')
+    path('increaselambdaaccuracy/', views.increase_lambda_accuracy, name= 'increase_lambda_accuracy'),
 
     
+    path('supervisorlogin/', views.supervisorlogin, name='supervisorlogin'),
+    path('supervisorlocation/',views.supervisorlocation,name = 'supervisorlocation')
 
     # path('testdata/',views.testdata,name='PersonView'),
-
-
     ]

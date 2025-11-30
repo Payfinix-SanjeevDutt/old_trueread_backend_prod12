@@ -98,10 +98,8 @@ class Consumers(models.Model):
     date_qc= models.CharField(max_length=300,null=True,blank=True)
     kvah_manual = models.CharField( max_length= 200, null=True,  blank=True)
     kvah_Status = models.CharField( max_length= 200, null=True,  blank=True)
- 
-    
-    
-
+    mtr_sr_no = models.CharField( max_length= 200, null=True,  blank=True)
+   
 
     #qc fields
     abnormalities_confirm=models.CharField(max_length=300,null=True,blank=True)
@@ -287,3 +285,31 @@ class notificatio_recepients(models.Model):
         db_table='notification_recepients'        
         
         
+from django.db import models
+
+class SupervisorLogin(models.Model):
+    id = models.AutoField(primary_key=True)
+    supervisor_number = models.CharField(max_length=15, unique=False)
+    password = models.CharField(max_length=128)
+
+    ofc_division = models.CharField(max_length=100, null=True, blank=True)
+    ofc_subdivision = models.CharField(max_length=100, null=True, blank=True)
+    mr_id = models.CharField(max_length=100, null=True, blank=True)
+    mr_name = models.CharField(max_length=100, null=True, blank=True)
+    mr_number = models.CharField(max_length=100, null=True, blank=True)
+    supervisor_name = models.CharField(max_length=100, null=True, blank=True)
+
+    is_admin = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "supervisorlogin"
+
+class SupervsiorLocation(models.Model):
+    id = models.AutoField(primary_key=True)
+    supervisor_number = models.CharField(max_length=15, unique=False)
+    geo_lat = models.CharField(max_length=300,null=True,blank=True)
+    geo_long = models.CharField(max_length=300,null=True,blank=True)
+    date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "supervsiorlocation"

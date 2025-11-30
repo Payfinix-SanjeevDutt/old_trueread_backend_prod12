@@ -3,7 +3,7 @@ from django.shortcuts import render
 from rest_framework.response import Response
 import requests
 from rest_framework.decorators import api_view, permission_classes
-from .models import Consumers, MeterReaderRegistration, Office, UserManagement
+from .models import Consumers, MeterReaderRegistration, Office, SupervisorLogin, UserManagement
 from .serializers import (
     MeterReaderRegistrationSerializer,
     ConsumerDataSerializer,
@@ -414,7 +414,11 @@ def consumers_bulk(request):
     count_update = 0
     failed_consumers = []
     for data in data_list:
- 
+        # ensure defaults for new keys
+        data['kvah_manual'] = data.get('kvah_manual', None)
+        data['kvah_Status'] = data.get('kvah_Status', None)
+        data['mtr_sr_no'] = data.get('mtr_sr_no', None)
+
         rdng_date = data["rdng_date"]
         cons_name = data["cons_name"]
         cons_ac_no = data["cons_ac_no"]
@@ -641,7 +645,10 @@ def consumers_bulk(request):
                     newid.rdng_ocr_status_odv == data['rdng_ocr_status_odv'] and
                     newid.prsnt_ocr_excep_old_values == data['prsnt_ocr_excep_old_values'] and
                     newid.kvah_rdng == data['kvah_rdng'] and
-                    newid.kvah_img == data['kvah_img']
+                    newid.kvah_img == data['kvah_img'] and
+                    newid.kvah_manual == data['kvah_manual'] and
+                    newid.kvah_Status == data['kvah_Status'] and
+                    newid.mtr_sr_no == data['mtr_sr_no']
                 ):
                     print("updatation does not takes place")
                     # return Response({"status": True, "message": "No change in Data"})
@@ -1835,7 +1842,7 @@ def minidashboard(request):
     cursor = connection.cursor()
     cursor.execute(
         f"""select count(readingmaster.rdng_ocr_status='Passed' or NULL),count(readingmaster.rdng_ocr_status='Failed' or NULL),count(readingmaster.prsnt_mtr_status='Meter Defective' or NULL),count(readingmaster.prsnt_mtr_status='Door Locked' or NULL),count(readingmaster.prsnt_mtr_status='Ok' or NULL),count(rdng_img)
-                    from readingmaster 
+                    from readingmaster
     """
     )
     consumers = Consumers.objects.values_list("cons_ac_no").distinct()
@@ -1933,7 +1940,7 @@ def exceptionlist(request):
     count(reading_parameter_type='Parameters Unavailable' or null),
     count(reading_parameter_type='' or null),
     count(prsnt_rdng_ocr_excep='No Exception Found' or prsnt_rdng_ocr_excep=''  or null)
-    
+
     from readingmaster where extract(month from reading_date_db)='{month}' and rdng_ocr_status='Failed' {clause}
     """
     query2 = f"""
@@ -1988,7 +1995,7 @@ def totalcounts(request):
     # ''')
     cursor.execute(
         f"""select count(readingmaster.rdng_ocr_status='Passed' or NULL),count(readingmaster.rdng_ocr_status='Failed' or NULL),count(readingmaster.prsnt_mtr_status='Meter Defective' or NULL),count(readingmaster.prsnt_mtr_status='Door Locked' or NULL)
-                    from readingmaster 
+                    from readingmaster
     """
     )
 
@@ -2428,14 +2435,14 @@ def minidashboardmonth(request):
         print("clause---------->", clause)
 
     cursor = connection.cursor()
-    query = f"""select 
+    query = f"""select
              count(readingmaster.rdng_ocr_status='Passed' or NULL),
              count(readingmaster.rdng_ocr_status='Failed' or NULL),
              count(readingmaster.prsnt_mtr_status='Meter Defective' or NULL),
              count(readingmaster.prsnt_mtr_status='Door Locked' or NULL),
              count(readingmaster.prsnt_mtr_status='Ok' or NULL),
              count(*),
-             count(distinct mr_id) 
+             count(distinct mr_id)
              from readingmaster WHERE EXTRACT (MONTH FROM reading_date_db)='{month}' {clause}
     """
     cursor.execute(query)
@@ -2988,91 +2995,91 @@ def topmeterreaders1(request):
     if agency != "null":
         clause = f"and m.bl_agnc_name='{agency}'"
     query = f"""
-SELECT r."mrName", 
+SELECT r."mrName",
 
-       SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed, 
+       SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed,
 
-       SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed, 
+       SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed,
 
-       count(m.prsnt_mtr_status='Ok' or NULL) AS ok, 
+       count(m.prsnt_mtr_status='Ok' or NULL) AS ok,
 
-       
 
-       ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float) 
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective, 
+       ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 
-       ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float) 
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective,
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked, 
+       ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 
-         
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked,
 
-        count(m.mr_id) as total, 
 
- 
 
-       CASE  
+        count(m.mr_id) as total,
 
-           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0 
 
-           ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float) 
 
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)  
+       CASE
 
-       END as passed_percent, 
+           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
 
- 
+           ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
 
-       CASE  
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
 
-           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0 
+       END as passed_percent,
 
-           ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float) 
 
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)  
 
-       END as failed_percent, 
+       CASE
 
- 
+           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
 
-       ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float) 
+           ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float)
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent, 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
 
-       r."mrPhoto", 
+       END as failed_percent,
 
-       r."mrPhone", 
 
-       r."mrId", 
 
-        
+       ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float)
 
-       (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product" 
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent,
 
-FROM readingmaster m , meterreaderregistration r 
+       r."mrPhoto",
 
-     where m.mr_id = r."mrId"  
+       r."mrPhone",
+
+       r."mrId",
+
+
+
+       (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product"
+
+FROM readingmaster m , meterreaderregistration r
+
+     where m.mr_id = r."mrId"
 
 AND EXTRACT(MONTH FROM m.reading_date_db)='{month}' {clause}
 
-GROUP BY r."mrName", 
+GROUP BY r."mrName",
 
-         r."mrPhoto", 
+         r."mrPhoto",
 
-         r."mrPhone", 
+         r."mrPhone",
 
-         r."mrId" 
+         r."mrId"
 
-HAVING count(m.mr_id)> (DATE_PART('day', CURRENT_DATE) * 30) and ( ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float) 
+HAVING count(m.mr_id)> (DATE_PART('day', CURRENT_DATE) * 30) and ( ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=2) and (ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float) 
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=2) and (ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=20) 
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=20)
 
-ORDER BY passed_percent  DESC 
+ORDER BY passed_percent  DESC
 
-limit 10 
+limit 10
 
 """
     print("query")
@@ -3216,7 +3223,7 @@ def exceptionlistsbpdclmonth(request):
    count(reading_parameter_type='Parameters Unavailable' or null),
    count(reading_parameter_type='' or null),
    count(prsnt_rdng_ocr_excep='No Exception Found' or prsnt_rdng_ocr_excep=''  or null)
-  
+
     from readingmaster where extract(month from reading_date_db)='{month}' and ofc_discom='SBPDCL' and rdng_ocr_status='Failed' {clause}
     """
     query2 = f"""
@@ -3266,7 +3273,7 @@ def exceptionlistnbpdclmonth(request):
    count(reading_parameter_type='Parameters Unavailable' or null),
    count(reading_parameter_type='' or null),
    count(prsnt_rdng_ocr_excep='No Exception Found' or prsnt_rdng_ocr_excep=''  or null)
-  
+
     from readingmaster where extract(month from reading_date_db)='{month}' and ofc_discom='NBPDCL' and rdng_ocr_status='Failed' {clause}
     """
     query2 = f"""
@@ -3309,38 +3316,38 @@ SELECT r."mrName",
        SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed,
        SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed,
        count(m.prsnt_mtr_status='Ok' or NULL) AS ok,
-      
+
        ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective,
        ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked,
-        
+
         count(m.mr_id) as total,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as passed_percent,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as failed_percent,
 
        ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent,
-      
+
        r."mrPhoto",
        r."mrPhone",
        r."mrId",
-       
+
        (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product"
 FROM readingmaster m ,
      meterreaderregistration r
      where m.mr_id = r."mrId" AND ofc_discom='SBPDCL' {clause}
-AND EXTRACT(MONTH FROM m.reading_date_db)='{month}' 
+AND EXTRACT(MONTH FROM m.reading_date_db)='{month}'
 GROUP BY r."mrName",
          r."mrPhoto",
          r."mrPhone",
@@ -3408,33 +3415,33 @@ SELECT r."mrName",
        SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed,
        SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed,
        count(m.prsnt_mtr_status='Ok' or NULL) AS ok,
-      
+
        ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective,
        ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked,
-        
+
         count(m.mr_id) as total,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as passed_percent,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as failed_percent,
 
        ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent,
-      
+
        r."mrPhoto",
        r."mrPhone",
        r."mrId",
-       
+
        (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product"
 FROM readingmaster m ,
      meterreaderregistration r
@@ -3700,8 +3707,8 @@ def dailybilling(request):
     query = f"""select o.zone as Zone, o.divisionname as Division, o.subdivision, o.no_of_consumers,
 (count(distinct case when m.reading_date_db='{todaydate}' then m.id end)) as total_billed_today,
 (count(distinct case when extract(month from m.reading_date_db)='{month}'then m.cons_ac_no end)) as total_billed_this_month
-from office_consumers o 
-left join readingmaster m on o.zone=m.ofc_zone and o.divisionname=m.ofc_division 
+from office_consumers o
+left join readingmaster m on o.zone=m.ofc_zone and o.divisionname=m.ofc_division
 and o.subdivision=m.ofc_subdivision
 group by o.zone,o.divisionname,o.subdivision,o.no_of_consumers
 order by total_billed_today desc
@@ -3886,89 +3893,89 @@ def performancewisemrs(request):
 
     cursor = connection.cursor()
     query = f"""
-SELECT r."mrName", 
+SELECT r."mrName",
 
-       SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed, 
+       SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed,
 
-       SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed, 
+       SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed,
 
-       count(m.prsnt_mtr_status='Ok' or NULL) AS ok, 
+       count(m.prsnt_mtr_status='Ok' or NULL) AS ok,
 
-       ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float) 
+       ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective, 
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective,
 
-       ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float) 
+       ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked, 
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked,
 
-         
 
-        count(m.mr_id) as total, 
 
- 
+        count(m.mr_id) as total,
 
-       CASE  
 
-           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0 
 
-           ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float) 
+       CASE
 
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)  
+           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
 
-       END as passed_percent, 
+           ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
 
- 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
 
-       CASE  
+       END as passed_percent,
 
-           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0 
 
-           ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float) 
 
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)  
+       CASE
 
-       END as failed_percent, 
+           WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
 
- 
+           ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float)
 
-       ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent, 
+       END as failed_percent,
 
-       r."mrPhoto", 
 
-       r."mrPhone", 
 
-       r."mrId", 
+       ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float)
 
-        
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent,
 
-       (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product" 
+       r."mrPhoto",
 
-FROM readingmaster m , 
+       r."mrPhone",
 
-     meterreaderregistration r 
+       r."mrId",
 
-     where m.mr_id = r."mrId"  
 
-AND EXTRACT(MONTH FROM m.reading_date_db)='{month}'  
 
-GROUP BY r."mrName", 
+       (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product"
 
-         r."mrPhoto", 
+FROM readingmaster m ,
 
-         r."mrPhone", 
+     meterreaderregistration r
 
-         r."mrId" 
+     where m.mr_id = r."mrId"
 
-HAVING count(m.mr_id)> (DATE_PART('day', CURRENT_DATE) * 30) and ( ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float) 
+AND EXTRACT(MONTH FROM m.reading_date_db)='{month}'
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=2) and (ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float) 
+GROUP BY r."mrName",
 
-/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=20) 
+         r."mrPhoto",
 
-ORDER BY passed_percent  DESC 
+         r."mrPhone",
+
+         r."mrId"
+
+HAVING count(m.mr_id)> (DATE_PART('day', CURRENT_DATE) * 30) and ( ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
+
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=2) and (ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
+
+/ COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) <=20)
+
+ORDER BY passed_percent  DESC
 
 """
     print("query")
@@ -4025,38 +4032,38 @@ SELECT r."mrName",
        SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed,
        SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed,
        count(m.prsnt_mtr_status='Ok' or NULL) AS ok,
-      
+
        ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective,
        ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked,
-        
+
         count(m.mr_id) as total,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as passed_percent,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as failed_percent,
 
        ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent,
-      
+
        r."mrPhoto",
        r."mrPhone",
        r."mrId",
-       
+
        (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product"
 FROM readingmaster m ,
      meterreaderregistration r
      where m.mr_id = r."mrId" AND ofc_discom='SBPDCL'
-AND EXTRACT(MONTH FROM m.reading_date_db)='{month}' 
+AND EXTRACT(MONTH FROM m.reading_date_db)='{month}'
 GROUP BY r."mrName",
          r."mrPhoto",
          r."mrPhone",
@@ -4121,38 +4128,38 @@ SELECT r."mrName",
        SUM(CASE WHEN m.rdng_ocr_status='Passed' THEN 1 ELSE 0 END) as passed,
        SUM(CASE WHEN m.rdng_ocr_status='Failed' THEN 1 ELSE 0 END) as failed,
        count(m.prsnt_mtr_status='Ok' or NULL) AS ok,
-      
+
        ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective,
        ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked,
-        
+
         count(m.mr_id) as total,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as passed_percent,
 
-       CASE 
+       CASE
            WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
            ELSE ROUND((cast(count(rdng_ocr_status='Failed' or null) as float)
-           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+           / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
        END as failed_percent,
 
        ROUND((cast(count(prsnt_mtr_status='Ok' or null) as float)
 / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as OK_percent,
-      
+
        r."mrPhoto",
        r."mrPhone",
        r."mrId",
-       
+
        (DATE_PART('day', CURRENT_DATE) * 30) as "current_day_product"
 FROM readingmaster m ,
      meterreaderregistration r
      where m.mr_id = r."mrId" AND ofc_discom='NBPDCL'
-AND EXTRACT(MONTH FROM m.reading_date_db)='{month}' 
+AND EXTRACT(MONTH FROM m.reading_date_db)='{month}'
 GROUP BY r."mrName",
          r."mrPhoto",
          r."mrPhone",
@@ -4890,8 +4897,8 @@ def meterWiseReportUpdate(request):
             from readingmaster m {clause} and m.{groupby}!='' group by m.{groupby}
                 """
         else:
-            query = f"""                
-                select 
+            query = f"""
+                select
                     o.sectionname as location,
                     count(m.id) as id,
                     count(m.prsnt_mtr_status='Ok' or null) as Ok,
@@ -4909,65 +4916,65 @@ def meterWiseReportUpdate(request):
                     count(m.prsnt_rdng_ocr_excep='Meter Display Broken' or null) as Meter_Display_Broken,
                     count(m.prsnt_rdng_ocr_excep='Daylight Reflection On Meter' or null) as Daylight_Reflection_On_Meter,
                     count(m.prsnt_rdng_ocr_excep='Backlight Reflection' or null) as Backlight_Reflection,
-                    CASE WHEN 
+                    CASE WHEN
                         count(m.prsnt_mtr_status='Ok' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_mtr_status='Ok' or null) as float)/cast(count(m.id) as float) * 100)::numeric, 2)
                     END as ok_persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.rdng_ocr_status='Passed' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.rdng_ocr_status='Passed' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as ocr_Passed_persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Parameters Incorrect' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Parameters Incorrect' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Parameters_Incorrect_Persent,
-                    CASE WHEN 
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Parameters Unclear' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Parameters Unclear' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Parameters_Unclear_Persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Parameters Unavailable' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Parameters Unavailable' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Parameters_Unavailable_Persent,
-                    CASE WHEN 
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Image Invalid' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Image Invalid' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Image_Invalid_Persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Image Unclear' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Image Unclear' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Image_Unclear_Persent,
-                
-                    CASE WHEN 
-                        count(m.prsnt_rdng_ocr_excep='Image Spoofed' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Image Spoofed' or null) as float)/ cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+
+                    CASE WHEN
+                        count(m.prsnt_rdng_ocr_excep='Image Spoofed' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Image Spoofed' or null) as float)/ cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Image_Spoofed_Persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Image Stain on Decimal' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Image Stain on Decimal' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Image_Stain_On_Decimal_persent,
-                
-                    CASE WHEN 
-                        count(m.prsnt_rdng_ocr_excep='Meter Mismatched' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter Mismatched' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+
+                    CASE WHEN
+                        count(m.prsnt_rdng_ocr_excep='Meter Mismatched' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter Mismatched' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Meter_Mismatched_persent,
-                
-                    CASE WHEN 
-                        count(m.prsnt_rdng_ocr_excep='Meter On Height' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter On Height' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+
+                    CASE WHEN
+                        count(m.prsnt_rdng_ocr_excep='Meter On Height' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter On Height' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Meter_On_Height_Persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Meter Dirty' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter Dirty' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Meter_Dirty_Persent,
-                
-                    CASE WHEN 
-                        count(m.prsnt_rdng_ocr_excep='Meter Display Broken' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter Display Broken' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2) 
+
+                    CASE WHEN
+                        count(m.prsnt_rdng_ocr_excep='Meter Display Broken' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Meter Display Broken' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Meter_Display_Broken_Persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Daylight Reflection On Meter' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Daylight Reflection On Meter' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Daylight_Reflection_On_Meter_Persent,
-                
-                    CASE WHEN 
+
+                    CASE WHEN
                         count(m.prsnt_rdng_ocr_excep='Backlight Reflection' or null) = 0 THEN 0 ELSE ROUND((cast(count(m.prsnt_rdng_ocr_excep='Backlight Reflection' or null) as float)/cast(count(m.prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
                     END as Backlight_Reflection_Persent
-                
-                from readingmaster m 
+
+                from readingmaster m
                 join
                     (
                         SELECT DISTINCT sectioncode, MAX(sectionname) AS sectionname
@@ -5401,7 +5408,7 @@ def new_get_meter_summary(request):
     (COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) - COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) AS diff,
     ofc_division,ofc_subdivision
     FROM
-    {tablename} where mr_id !='' 
+    {tablename} where mr_id !=''
     {clause}
     GROUP BY
     mr_id,ofc_division,ofc_subdivision;
@@ -6207,6 +6214,125 @@ def newmvsummary(request):
 #     print(query)
 #     return Response({"count": total_count, "results": results})
 
+# deepak
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from api.models import SupervisorLogin
+import uuid
+
+@api_view(["POST"])
+def supervisorlogin(request):
+    number = request.data.get("supervisor_number")
+    password = request.data.get("password")
+
+    if not number or not password:
+        return Response({
+            "status": False,
+            "message": "supervisor_number and password required",
+            "accessToken": "",
+            "user": None
+        })
+
+    user = SupervisorLogin.objects.filter(
+        supervisor_number=number,
+        password=password
+    ).first()   # <-- FIX
+
+    if not user:
+        return Response({
+            "status": False,
+            "message": "login failed",
+            "accessToken": "",
+            "user": None
+        })
+
+    return Response({
+        "status": True,
+        "message": "login successful",
+        "accessToken": "",
+        "user": {
+            "supervise_name": user.supervisor_name or "",
+            "supervise_number": user.supervisor_number or "",
+            "is_admin": user.is_admin,
+            "designation": "Supervisor",
+            "division": user.ofc_division or "",
+            "subdivison": user.ofc_subdivision or ""
+        }
+    })
+
+#deeepak
+from api.models import SupervsiorLocation
+from django.db import DatabaseError, IntegrityError
+@api_view(["POST"])
+def supervisorlocation(request):
+    try:
+        # Validate required fields
+        supervisor_number = request.data.get("supervisor_number")
+        geo_lat = request.data.get("geo_lat")
+        geo_long = request.data.get("geo_long")
+        date_str = request.data.get("date")   # format: "2025-11-27"
+
+        # Check if all required fields are present
+        if not all([supervisor_number, geo_lat, geo_long, date_str]):
+            return Response({
+                "status": False,
+                "message": "Missing required fields: supervisor_number, geo_lat, geo_long, date"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate and convert string to date
+        try:
+            date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({
+                "status": False,
+                "message": "Invalid date format. Expected format: YYYY-MM-DD"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate latitude and longitude
+        geo_lat = float(geo_lat)
+        geo_long = float(geo_long)
+            
+
+        try:
+            obj, created = SupervsiorLocation.objects.update_or_create(
+                supervisor_number=supervisor_number,
+                date=date,
+                defaults={
+                    "geo_lat": geo_lat,
+                    "geo_long": geo_long,
+                }
+            )
+
+            if created:
+                return Response({
+                    "status": True,
+                    "message": "location added",
+                })
+            else:
+                return Response({
+                    "status": True,
+                    "message": "location updated",
+                })
+                
+        except IntegrityError as e:
+            return Response({
+                "status": False,
+                "message": f"Database integrity error: {str(e)}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        except DatabaseError as e:
+            return Response({
+                "status": False,
+                "message": f"Database error: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+    except Exception as e:
+        return Response({
+            "status": False,
+            "message": f"An error occurred: {str(e)}"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 @api_view(["POST"])
 def newmvcheck(request):
@@ -6214,22 +6340,26 @@ def newmvcheck(request):
     page = request.data.get("page", 1)
     orderby = request.data.get("orderby", "DESC")
     filters = request.data.get("filters", {})
-    print("filters...",filters)
+    print("filters...", filters)
     export_all = request.data.get("export_all", False)  # NEW FLAG
- 
+
     offset = (int(pagesize) * int(page)) - int(pagesize) if pagesize else 0
- 
+
     # Build filter clause
     clause_parts = []
     for key, value in filters.items():
         if key == "month":
             year, month = value.split("-")
-            clause_parts.append(f"EXTRACT(month from m.reading_date_db) = '{month}'")
-            clause_parts.append(f"EXTRACT(year from m.reading_date_db) = '{year}'")
+            clause_parts.append(
+                f"EXTRACT(month from m.reading_date_db) = '{month}'")
+            clause_parts.append(
+                f"EXTRACT(year from m.reading_date_db) = '{year}'")
         elif key == "startdate":
-            clause_parts.append(f"EXTRACT(day from m.reading_date_db) >= '{value}'")
+            clause_parts.append(
+                f"EXTRACT(day from m.reading_date_db) >= '{value}'")
         elif key == "enddate":
-            clause_parts.append(f"EXTRACT(day from m.reading_date_db) <= '{value}'")
+            clause_parts.append(
+                f"EXTRACT(day from m.reading_date_db) <= '{value}'")
         elif key == "mr_id":
             clause_parts.append(f"m.mr_id = '{value}'")
         elif key == "prsnt_mtr_status":
@@ -6248,17 +6378,21 @@ def newmvcheck(request):
                 exception_detail = filters.get("prsnt_rdng_ocr_excep")
                 clause_parts.append("m.rdng_ocr_status = 'Failed'")
                 if exception_detail:
-                    clause_parts.append(f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
+                    clause_parts.append(
+                        f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
         elif key == "bl_agnc_name":
             clause_parts.append(f"bl_agnc_name = '{value}'")
+        # elif key == "ofc_discom":
+        #     clause_parts.append(f"ofc_discom = '{value}'")
         elif key == "ofc_discom":
-            clause_parts.append(f"ofc_discom = '{value}'")
- 
+            if value and value.upper() != "ALL":
+                clause_parts.append(f"ofc_discom = '{value}'")
+
     clause = " AND ".join(clause_parts)
     clause = f" AND {clause}" if clause else ""
- 
+
     tablename = "readingmaster"  # Adjust if needed
- 
+
     # Base SELECT
     query = f"""
         SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng,
@@ -6269,19 +6403,19 @@ def newmvcheck(request):
         FROM {tablename} m
         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
-               OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
+               OR m.rdng_ocr_status_changed_by ILIKE '%vapp%' OR m.qc_done != 'byLambda')
         AND m.rdng_img != '' {clause}
         ORDER BY m.rdng_date {orderby}
     """
- 
+
     # Only apply LIMIT/OFFSET when NOT exporting all
     if not export_all and pagesize:
         query += f" LIMIT {pagesize} OFFSET {offset}"
- 
+
     cursor = connection.cursor()
     cursor.execute(query)
     results = dictfetchall(cursor)
- 
+
     if export_all:
         # No need to run count, just return all rows
         return Response({"count": len(results), "results": results})
@@ -6296,7 +6430,7 @@ def newmvcheck(request):
         """
         cursor.execute(query_total)
         total_count = dictfetchall(cursor)[0]["count"]
- 
+
         return Response({"count": total_count, "results": results})
 
 
@@ -6358,14 +6492,14 @@ def gitnewmvcheck(request):
 
     # Base SELECT
     query = f"""
-        SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng, 
-               m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading, 
-               m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status, 
-               m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto", 
+        SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng,
+               m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading,
+               m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status,
+               m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto",
                m.prsnt_rdng_ocr_excep, m.reading_parameter_type
         FROM {tablename} m
         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-        WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by='' 
+        WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
                OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
         AND m.rdng_img != '' {clause}
         ORDER BY m.rdng_date {orderby}
@@ -6387,8 +6521,8 @@ def gitnewmvcheck(request):
         query_total = f"""
             SELECT COUNT(*) FROM {tablename} m
             LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-            WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by='' 
-                   OR m.rdng_ocr_status_changed_by ILIKE '%vapp%') 
+            WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
+                   OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
             AND m.rdng_img != '' {clause}
         """
         cursor.execute(query_total)
@@ -6785,7 +6919,7 @@ def newmonthdataa(request):
         current_month, previous_month} else "prevmonthsdata"
 
     cursor = connection.cursor()
-    query = f"""               
+    query = f"""
        SELECT r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision,
                COUNT(*) AS billed_consumers,
                COUNT(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END) AS ok_readings,
@@ -6794,28 +6928,24 @@ def newmonthdataa(request):
                COUNT(CASE WHEN prsnt_mtr_status='Meter Defective' THEN 1 END) AS MeterDefective,
                COUNT(CASE WHEN prsnt_mtr_status='Door Locked' THEN 1 END) AS DoorLocked,
                r.bl_agnc_name,
-               COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) 
+               COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END)
                - (COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END)
                + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) AS diff,
                SUM(CASE WHEN rdng_ocr_status = 'Failed' and qc_rmrk='MR Fault' THEN 1 ELSE 0 END) AS mrFault,
-<<<<<<< HEAD
-               SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' THEN 1 ELSE 0 END) AS imageBlur,
-=======
                SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS imageBlur,
->>>>>>> b13739e6fb2488f9ba49be177003b87986e02950
             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Incorrect Reading' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS incorrectReading,
-            SUM(CASE 
+            SUM(CASE
         WHEN (prsnt_rdng_ocr_excep = 'Meter Dirty' and rdng_ocr_status='Failed')
-             OR (rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '') 
-        THEN 1 
-        ELSE 0 
+             OR (rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '')
+        THEN 1
+        ELSE 0
     END) AS meterDirty,
             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS noExcepFound,
             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image'  AND rdng_ocr_status = 'Failed' THEN 1 ELSE 0 END) AS spoofedImage,
             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS invalidImage
         FROM {tablename} r
         {clause}
-        GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name; 
+        GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name;
     """
 
     print("QUERY------>", query)
@@ -7098,7 +7228,7 @@ FULL JOIN
         FROM
             readingmaster
         WHERE
-            bill_month_dt='{bill_month}' 
+            bill_month_dt='{bill_month}'
             AND ofc_zone != '' {clause}
         GROUP BY
             ofc_division,
@@ -7117,7 +7247,7 @@ FULL JOIN
         FROM
             readingmaster
         WHERE
-            reading_date_db = '{todaydate}' 
+            reading_date_db = '{todaydate}'
             AND ofc_zone != '' {clause}
         GROUP BY
             ofc_division,
@@ -7126,7 +7256,7 @@ FULL JOIN
     ) AS daily ON oc.agency = daily.agency
     AND oc.zone = daily.zone
     AND oc.division = daily.division
-    
+
 ORDER BY
     division, agency, zone;
 
@@ -7141,179 +7271,473 @@ ORDER BY
 # ghulam
 @api_view(["POST"])
 def qccheckmobile(request):
-    data = UserManagement.objects.filter(email=request.data["email"])
-    serializer = UserManagementSerializer(data, many=True)
-    my_dict = serializer.data[0]
-    print("my_dict", my_dict)
-    ofc_zone = [value for key, value in my_dict.items() if key ==
-                "ofc_zone"][0]
-    ofc_circle = [value for key, value in my_dict.items() if key ==
-                  "ofc_circle"][0]
-    ofc_division = [value for key,
-                    value in my_dict.items() if key == "ofc_division"][0]
-    new = []
-    print("serializer", serializer)
 
-    def listfun(dict):
-        new.append(dict.copy())
-        return new
+    super_number = request.data.get("supervisor_number")
+
+    # Fetch all rows of this supervisor
+    qs = SupervisorLogin.objects.filter(supervisor_number=super_number)
+
+    if not qs.exists():
+        return Response({"status": False, "message": "Supervisor not found"})
+
+    # Get all MR IDs
+    mr_ids = list(qs.values_list("mr_id", flat=True))
+
+    # Convert list to SQL-safe list: '2431MRC148','2431MRC149',...
+    mr_sql_list = ",".join(f"'{x}'" for x in mr_ids)
+
+    # Take office details from the first row
+    obj = qs.first()
+    ofc_division = obj.ofc_division
+    ofc_subdivision = obj.ofc_subdivision
+
+    start_date = request.data.get("start_date")
+    end_date = request.data.get("end_date")
 
     cursor = connection.cursor()
-    query = f"""select count(r.id) as totalreadings,
-        count(r.qc_req='Yes' or null) as qcremaining, 
-        count(r.qc_req='No' or null) as qcdone from readingmaster r 
-        where r.prsnt_mtr_status='Ok' and r.rdng_ocr_status='Failed' and r.ofc_zone = '{ofc_zone}' and r.ofc_circle = '{ofc_circle}' and r.ofc_division= '{ofc_division}'
-    """
-    print("query", query)
-    cursor.execute(query)
-    person_objects1 = dictfetchall(cursor)
-    query1 = f"""select r.id as id,r.cons_name as consumername,r.cons_ac_no as consumeraccno,r.con_mtr_sl_no as consumermeterslno,
-    r.qc_meter_status as qcmeterstatus,r.qc_ocr_status as qcocrstatus,r.prsnt_rdng as prsntrdng,r.prsnt_ocr_rdng as prsntocrrdng,
-    r.rdng_ocr_status as rdngocrstatus,r.rdng_img as rdngimg,
-    r.prsnt_mtr_status as prsntmtrstatus,r.abnormality as abnormality from readingmaster r 
-    where r.qc_req='Yes' and r.prsnt_mtr_status='Ok' and r.rdng_ocr_status='Failed' and r.ofc_zone = '{ofc_zone}' and r.ofc_circle = '{ofc_circle}' and r.ofc_division= '{ofc_division}' order by id DESC LIMIT 1  """
-    cursor.execute(query1)
-    person_objects = dictfetchall(cursor)
 
-    res = {**person_objects[0], **person_objects1[0]}
-    return Response(res)
+    # --- QUERY 1: Date range summary ---
+    query = f"""
+        SELECT
+            COUNT(r.id) AS totalreadings,
+            COUNT(CASE WHEN r.rdng_ocr_status = 'Passed' THEN 1 END) AS totalpassed,
+            COUNT(CASE WHEN r.rdng_ocr_status = 'Failed' THEN 1 END) AS totalfailed
+        FROM readingmaster r
+        WHERE
+            r.prsnt_mtr_status = 'Ok'
+            AND r.ofc_division = '{ofc_division}'
+            AND r.ofc_subdivision = '{ofc_subdivision}'
+            AND r.mr_id IN ({mr_sql_list})
+            AND r.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
+    """
+
+    cursor.execute(query)
+    date_data = dictfetchall(cursor)
+    print("QC Summary Query:", query)
+
+    # --- QUERY 2: Today summary ---
+    query2 = f"""
+        SELECT
+            COUNT(r.id) AS todaystotalreadings,
+            COUNT(CASE WHEN r.rdng_ocr_status = 'Passed' THEN 1 END) AS todayspassed,
+            COUNT(CASE WHEN r.rdng_ocr_status = 'Failed' THEN 1 END) AS todaysfailed
+        FROM readingmaster r
+        WHERE
+            r.prsnt_mtr_status = 'Ok'
+            AND r.ofc_division = '{ofc_division}'
+            AND r.ofc_subdivision = '{ofc_subdivision}'
+            AND r.mr_id IN ({mr_sql_list})
+            AND r.reading_date_db = CURRENT_DATE
+    """
+
+    cursor.execute(query2)
+    today_data = dictfetchall(cursor)
+    print("QC Today Query:", query2)
+
+    return Response({
+        **date_data[0],   # total/passed/failed for range
+        **today_data[0],  # today’s totals
+    })
 
 
 @api_view(["POST"])
+def androidclusterstestnew(request):
+    filters = request.data.get("filters", {})
+    today = date.today()
+ 
+    where_clauses = ["reading_date_db = %s"]
+    params = [str(today)]
+ 
+    # Dynamic filters
+    if "mr_id" in filters:
+        where_clauses.append("mr_id = %s")
+        params.append(filters["mr_id"])
+ 
+    if "bl_agnc_name" in filters:
+        where_clauses.append("bl_agnc_name = %s")
+        params.append(filters["bl_agnc_name"])
+ 
+    where_sql = "WHERE " + " AND ".join(where_clauses)
+ 
+    query = f"""
+        SELECT DISTINCT ON (mr_id)
+            mr_id, rdng_date, cons_name, geo_lat, geo_long,
+            prsnt_mtr_status, rdng_ocr_status, rdng_img
+        FROM readingmaster
+        {where_sql}
+        ORDER BY mr_id,
+                 (geo_lat IS NULL OR geo_long IS NULL),  -- Prefer NOT NULL
+                 rdng_date DESC                          -- Latest record
+    """
+ 
+    cursor = connection.cursor()
+    cursor.execute(query, params)
+    print("query:>",query)
+    result = dictfetchall(cursor)
+ 
+    return Response(result)
+
+@api_view(["POST"])
 def qcmobiledashboard(request):
-    data = UserManagement.objects.filter(email=request.data["email"])
-    pagesize = request.data.get("pagesize")
-    page = request.data.get(
-        "page",
-    )
-    offset = (int(pagesize) * int(page)) - int(pagesize)
-    serializer = UserManagementSerializer(data, many=True)
-    now = datetime.now()
-    month = now.month
-    print("serializer--", serializer.data)
-    my_dict = serializer.data[0]
-    ofc_division = [value for key,
-                    value in my_dict.items() if key == "ofc_division"][0]
-    ofc_zone = [value for key, value in my_dict.items() if key ==
-                "ofc_zone"][0]
-    ofc_circle = [value for key, value in my_dict.items() if key ==
-                  "ofc_circle"][0]
 
-    full_name = [value for key, value in my_dict.items() if key ==
-                 "full_name"][0]
-    designation = [value for key, value in my_dict.items() if key == "designation"][
-        0
-    ].lower()
-    if designation == "supervisor":
-        new = []
+    super_number = request.data.get("supervisor_number")
 
-        def listfun(dict):
-            new.append(dict.copy())
-            return new
+    # Fetch all rows for this supervisor
+    qs = SupervisorLogin.objects.filter(supervisor_number=super_number)
 
-        cursor = connection.cursor()
-        query = f"""select count(r.id) as total_readings,
-        count(r.qc_req='Yes' or null) as qc_remaining, 
-        count(r.qc_req='No' or null) as qc_done from readingmaster r
-        where r.ofc_zone = '{ofc_zone}' and r.ofc_circle = '{ofc_circle}' and r.ofc_division= '{ofc_division}'
-        """
-        cursor.execute(query)
-        person_objects1 = dictfetchall(cursor)
-        query = f"""
-        select DISTINCT(mr_id),
-        CASE WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
-        ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
-        / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
-        END as passed_percent,
-        ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
-        / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective_percent,
-        ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
-        / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked_percent,
-        
-        count(id) as mr_total_readings,
-        count(qc_req='Yes' or null) as mr_qc_remaining, 
-        count(qc_req='No' or null) as mr_qc_done,count(*)
-        over () as mr_count
-        from readingmaster where extract(Month from reading_date_db)='{month}' and ofc_zone = '{ofc_zone}' and ofc_circle = '{ofc_circle}' and ofc_division= '{ofc_division}' group by mr_id order by passed_percent,Meter_Defective_percent limit {pagesize} offset {offset}
-        """
-        print(query)
-        cursor.execute(query)
-        person_objects = dictfetchall(cursor)
-        return Response(
-            {
-                "status": True,
-                "message": f"""{pagesize} data fetched successfully""",
-                "user_name": full_name,
-                "division": ofc_division,
-                "data": person_objects1[0],
-                "mr_data": person_objects,
-            }
-        )
+    # Get all MR IDs
+    mr_ids = list(qs.values_list("mr_id", flat=True))
 
-    return Response({"status": False, "message": """You are not a Supervisor"""})
+    # Get first row fields
+    obj = qs.first()
+    if not obj:
+        return Response({"status": False, "message": "Supervisor not found"})
+
+    ofc_division = obj.ofc_division
+    ofc_subdivision = obj.ofc_subdivision
+    supervisor_name = obj.supervisor_name
+    # designation = obj.designation.lower()
+
+    pagesize = int(request.data.get("pagesize", 10))
+    page = int(request.data.get("page", 1))
+    offset = (pagesize * page) - pagesize
+
+    start_date = request.data.get("start_date")
+    end_date = request.data.get("end_date")
+
+    if not start_date or not end_date:
+        return Response({"error": "start_date and end_date are required"}, status=400)
+
+    # Supervisor only
+    # if designation != "supervisor":
+    #     return Response({"status": False, "message": "You are not a Supervisor"})
+
+    # Convert MR IDs to SQL list (1,2,3,...)
+    mr_id_sql_list = ",".join(f"'{i}'" for i in mr_ids)
+
+
+    cursor = connection.cursor()
+
+    query = f"""
+        SELECT *
+        FROM (
+            SELECT
+                mr_id,
+
+                -- MOST RECENT GEO
+                (
+                    SELECT geo_lat
+                    FROM readingmaster rm2
+                    WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
+                    AND rm2.geo_lat IS NOT NULL
+                    AND rm2.geo_lat <> ''
+                    ORDER BY rm2.reading_date_db DESC
+                    LIMIT 1
+                ) AS geo_lat,
+                --last active time
+                (
+                    SELECT
+                        SPLIT_PART(rm2.rdng_date, ' ', 2)   -- extract time part
+                    FROM readingmaster rm2
+                    WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
+                    AND rm2.rdng_date IS NOT NULL
+                    AND rm2.rdng_date <> ''
+                    ORDER BY rm2.rdng_date::timestamp DESC
+                    LIMIT 1
+                ) AS latest_time,
+                (
+                    SELECT geo_long
+                    FROM readingmaster rm2
+                    WHERE rm2.mr_id = readingmaster.mr_id
+                    AND rm2.reading_date_db BETWEEN '{start_date}' AND '{end_date}'
+                    AND rm2.geo_long IS NOT NULL
+                    AND rm2.geo_long <> ''
+                    ORDER BY rm2.reading_date_db DESC
+                    LIMIT 1
+                ) AS geo_long,
+
+                CASE
+                    WHEN COUNT(CASE WHEN reading_date_db = CURRENT_DATE THEN 1 END) > 0
+                    THEN 'Active'
+                    ELSE 'Inactive'
+                END AS status,
+
+                CASE
+                    WHEN COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) = 0
+                    THEN 0
+                    ELSE ROUND(
+                        (
+                            COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END)::float /
+                            NULLIF(COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END), 0)
+                        )::numeric * 100
+                    , 2)
+                END AS passed_percent,
+
+                ROUND(
+                    (
+                        COUNT(CASE WHEN prsnt_mtr_status = 'Meter Defective' THEN 1 END)::float /
+                        NULLIF(COUNT(mr_id)::float, 0)
+                    )::numeric * 100
+                , 2) AS meter_defective_percent,
+
+                ROUND(
+                    (
+                        COUNT(CASE WHEN prsnt_mtr_status = 'Door Locked' THEN 1 END)::float /
+                        NULLIF(COUNT(mr_id)::float, 0)
+                    )::numeric * 100
+                , 2) AS door_locked_percent,
+
+                COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) AS mr_total_readings,
+
+                COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) AS totalpassed,
+                COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END) AS totalfailed,
+
+                COUNT(CASE WHEN qc_req = 'Yes' THEN 1 END) AS mr_qc_remaining,
+                COUNT(CASE WHEN qc_req = 'No' THEN 1 END) AS mr_qc_done,
+
+                COUNT(*) OVER() AS mr_count
+
+            FROM readingmaster
+            WHERE
+                reading_date_db BETWEEN '{start_date}' AND '{end_date}'
+                AND ofc_division = '{ofc_division}'
+                AND ofc_subdivision = '{ofc_subdivision}'
+                AND mr_id IN ({mr_id_sql_list})
+
+            GROUP BY mr_id
+        ) AS sub
+
+        ORDER BY passed_percent ASC, meter_defective_percent ASC
+        LIMIT {pagesize} OFFSET {offset};
+    """
+
+    cursor.execute(query)
+    print("Query:-->", query)
+    result = dictfetchall(cursor)
+
+    return Response({
+        "status": True,
+        "message": f"{pagesize} data fetched successfully",
+        "user_name": supervisor_name,
+        "division": ofc_division,
+        "subdivision": ofc_subdivision,
+        "mr_data": result,
+    })
+
+
+# def qcmobiledashboard(request):
+#     data = UserManagement.objects.filter(email=request.data["email"])
+#     pagesize = request.data.get("pagesize")
+#     page = request.data.get("page")
+#     offset = (int(pagesize) * int(page)) - int(pagesize)
+
+#     serializer = UserManagementSerializer(data, many=True)
+#     my_dict = serializer.data[0]
+
+#     ofc_division = my_dict.get("ofc_division")
+#     ofc_zone = my_dict.get("ofc_zone")
+#     ofc_circle = my_dict.get("ofc_circle")
+#     full_name = my_dict.get("full_name")
+#     designation = my_dict.get("designation", "").lower()
+
+#     start_date = request.data.get("start_date")
+#     end_date = request.data.get("end_date")
+
+#     if not start_date or not end_date:
+#         return Response({"error": "start_date and end_date are required"}, status=400)
+
+#     # Supervisor Only
+#     if designation == "supervisor":
+
+#         cursor = connection.cursor()
+
+#         query = f"""
+#             SELECT *
+#             FROM (
+#                 SELECT
+#                     mr_id,
+ 
+#                     -- ACTIVE status based on TODAY'S activity
+#                     CASE
+#                         WHEN COUNT(CASE WHEN reading_date_db = CURRENT_DATE THEN 1 END) > 0
+#                         THEN 'Active'
+#                         ELSE 'Inactive'
+#                     END AS status,
+ 
+#                     -- % Passed
+#                     CASE
+#                         WHEN COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) = 0
+#                         THEN 0
+#                         ELSE ROUND(
+#                             (
+#                                 COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END)::float
+#                                 /
+#                                 NULLIF(COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END), 0)
+#                             )::numeric * 100
+#                         , 2)
+#                     END AS passed_percent,
+ 
+#                     -- Defective %
+#                     ROUND(
+#                         (
+#                             COUNT(CASE WHEN prsnt_mtr_status = 'Meter Defective' THEN 1 END)::float
+#                             /
+#                             NULLIF(COUNT(mr_id)::float, 0)
+#                         )::numeric * 100
+#                     , 2) AS meter_defective_percent,
+ 
+#                     -- Door Locked %
+#                     ROUND(
+#                         (
+#                             COUNT(CASE WHEN prsnt_mtr_status = 'Door Locked' THEN 1 END)::float
+#                             /
+#                             NULLIF(COUNT(mr_id)::float, 0)
+#                         )::numeric * 100
+#                     , 2) AS door_locked_percent,
+ 
+#                     COUNT(*) AS mr_total_readings,
+ 
+#                     -- Total Passed & Failed
+#                     COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) AS totalpassed,
+#                     COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END) AS totalfailed,
+ 
+#                     -- QC
+#                     COUNT(CASE WHEN qc_req = 'Yes' THEN 1 END) AS mr_qc_remaining,
+#                     COUNT(CASE WHEN qc_req = 'No' THEN 1 END) AS mr_qc_done,
+ 
+#                     COUNT(*) OVER() AS mr_count
+ 
+#                 FROM readingmaster
+ 
+#                 WHERE
+#                     reading_date_db BETWEEN '{start_date}' AND '{end_date}'
+#                     AND ofc_zone = '{ofc_zone}'
+#                     AND ofc_circle = '{ofc_circle}'
+#                     AND ofc_division = '{ofc_division}'
+ 
+#                 GROUP BY mr_id
+#             ) AS sub
+ 
+#             ORDER BY passed_percent ASC, meter_defective_percent ASC
+#             LIMIT {pagesize} OFFSET {offset};
+#         """
+
+#         print(query)
+#         cursor.execute(query)
+#         person_objects = dictfetchall(cursor)
+
+#         return Response({
+#             "status": True,
+#             "message": f"{pagesize} data fetched successfully",
+#             "user_name": full_name,
+#             "division": ofc_division,
+#             "mr_data": person_objects,
+#         })
+
+#     return Response({"status": False, "message": "You are not a Supervisor"})
 
 
 @api_view(["GET"])
 def downloadexcel(request):
-    email = request.query_params.get("email")
-    data = UserManagement.objects.filter(email=email).first()
 
-    if not data:
-        return Response({"status": False, "message": "User not found"})
+    supervisor_number = request.query_params.get("supervisor_number")
 
-    datewise = request.query_params.get("datewise", None)
-    now = datetime.now()
-    month = now.month
-    fulldate = now.date()
+    # Fetch supervisor rows
+    qs = SupervisorLogin.objects.filter(supervisor_number=supervisor_number)
+
+    if not qs.exists():
+        return Response({"status": False, "message": "Supervisor not found"})
+
+    # All MR IDs
+    mr_ids = list(qs.values_list("mr_id", flat=True))
+
+    # Convert → 'MRC1','MRC2',...
+    mr_sql_list = ",".join(f"'{x}'" for x in mr_ids)
+
+    # Supervisor info
+    sup = qs.first()
+    ofc_division = sup.ofc_division
+    ofc_subdivision = sup.ofc_subdivision
+
+    datewise = request.query_params.get("datewise")
+    today = datetime.now().date()
+    month = datetime.now().month
 
     if datewise == "date1":
-        clause = f""" reading_date_db='{fulldate}' """
+        clause = f"reading_date_db = '{today}'"
     else:
-        clause = f""" extract(Month from reading_date_db)='{month}' """
-
-    ofc_division = data.ofc_division
-    ofc_zone = data.ofc_zone
-    ofc_circle = data.ofc_circle
-    full_name = data.full_name
-    designation = data.designation.lower()
-
-    if designation != "supervisor":
-        return Response({"status": False, "message": """You are not a Supervisor"""})
+        clause = f"extract(Month from reading_date_db) = '{month}'"
 
     cursor = connection.cursor()
-    query = f"""select count(r.id) as total_readings,
-                count(r.qc_req='Yes' or null) as qc_remaining,
-                count(r.qc_req='No' or null) as qc_done from readingmaster r
-                where {clause} and r.ofc_zone = '{ofc_zone}' and r.ofc_circle = '{ofc_circle}' and r.ofc_division= '{ofc_division}'
-            """
-    print("query", query)
+
+    # ----- SUMMARY -----
+    query = f"""
+        SELECT 
+            COUNT(r.id) AS total_readings,
+            COUNT(r.qc_req='Yes' OR NULL) AS qc_remaining,
+            COUNT(r.qc_req='No' OR NULL) AS qc_done
+        FROM readingmaster r
+        WHERE 
+            {clause}
+            AND r.mr_id IN ({mr_sql_list})
+    """
+
+    print("query:", query)
     cursor.execute(query)
-    person_objects1 = dictfetchall(cursor)
-    query1 = f"""
-            select DISTINCT(mr_id),
-            CASE WHEN count(prsnt_mtr_status='Ok' or NULL) = 0 THEN 0
-            ELSE ROUND((cast(count(rdng_ocr_status='Passed' or null) as float)
-            / cast(count(prsnt_mtr_status='Ok' or null) as float) * 100)::numeric, 2)
-            END as passed_percent,
-            ROUND((cast(count(prsnt_mtr_status='Meter Defective' or null) as float)
-            / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Meter_Defective_percent,
-            ROUND((cast(count(prsnt_mtr_status='Door Locked' or null) as float)
-            / COALESCE(cast(count(mr_id) as float),1) * 100)::numeric, 2) as Door_locked_percent,
-            count(id) as mr_total_readings,
-            count(qc_req='Yes' or null) as mr_qc_remaining,
-            count(qc_req='No' or null) as mr_qc_done from readingmaster where {clause} and ofc_zone = '{ofc_zone}' and ofc_circle='{ofc_circle}' and ofc_division= '{ofc_division}' group by mr_id
-            """
-    print("query", query1)
-    cursor.execute(query1)
-    person_objects = dictfetchall(cursor)
+    summary = dictfetchall(cursor)
+
+    # ----- MR WISE DATA -----
+    query2 = f"""
+        SELECT 
+            DISTINCT(mr_id),
+            CASE WHEN COUNT(prsnt_mtr_status='Ok' OR NULL) = 0 THEN 0
+            ELSE ROUND(
+                (
+                    CAST(COUNT(rdng_ocr_status='Passed' OR NULL) AS FLOAT) /
+                    CAST(COUNT(prsnt_mtr_status='Ok' OR NULL) AS FLOAT) * 100
+                )::numeric
+            , 2) END AS passed_percent,
+
+            ROUND(
+                (
+                    CAST(COUNT(prsnt_mtr_status='Meter Defective' OR NULL) AS FLOAT) /
+                    COALESCE(CAST(COUNT(mr_id) AS FLOAT),1) * 100
+                )::numeric
+            , 2) AS meter_defective_percent,
+
+            ROUND(
+                (
+                    CAST(COUNT(prsnt_mtr_status='Door Locked' OR NULL) AS FLOAT) /
+                    COALESCE(CAST(COUNT(mr_id) AS FLOAT),1) * 100
+                )::numeric
+            , 2) AS door_locked_percent,
+
+            COUNT(id) AS mr_total_readings,
+            COUNT(qc_req='Yes' OR NULL) AS mr_qc_remaining,
+            COUNT(qc_req='No' OR NULL) AS mr_qc_done
+
+        FROM readingmaster
+        WHERE 
+            {clause}
+            AND mr_id IN ({mr_sql_list})
+        GROUP BY mr_id
+    """
+
+    print("query2:", query2)
+    cursor.execute(query2)
+    rows = dictfetchall(cursor)
+
+    # ---------- EXCEL ----------
     wb = Workbook()
     ws = wb.active
 
-    headers = list(person_objects[0].keys())
-    ws.append(headers)
-    for item in person_objects:
-        values = list(item.values())
-        ws.append(values)
+    if rows:
+        headers = list(rows[0].keys())
+        ws.append(headers)
+        for item in rows:
+            ws.append(list(item.values()))
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -7322,59 +7746,91 @@ def downloadexcel(request):
     wb.save(response)
     return response
 
-
 @api_view(["POST"])
 def mobilemvcards(request):
-    data = UserManagement.objects.filter(email=request.data["email"])
-    serializer = UserManagementSerializer(data, many=True)
-    my_dict = serializer.data[0]
-    ofc_zone = [value for key, value in my_dict.items() if key ==
-                "ofc_zone"][0]
-    ofc_circle = [value for key, value in my_dict.items() if key ==
-                  "ofc_circle"][0]
-    ofc_division = [value for key,
-                    value in my_dict.items() if key == "ofc_division"][0]
-    full_name = [value for key, value in my_dict.items() if key ==
-                 "full_name"][0]
-    designation = [value for key, value in my_dict.items() if key == "designation"][
-        0
-    ].lower()
-    pagesize = request.data.get(
-        "pagesize",
-    )
-    page = request.data.get(
-        "page",
-    )
-    searchdata = request.data.get(
-        "searchdata",
-    )
-    offset = (int(pagesize) * int(page)) - int(pagesize)
+
+    super_number = request.data.get("supervisor_number")
+
+    # Fetch all supervisor rows
+    qs = SupervisorLogin.objects.filter(supervisor_number=super_number)
+
+    if not qs.exists():
+        return Response({"status": False, "message": "Supervisor not found"})
+
+    # All MR IDs
+    mr_ids = list(qs.values_list("mr_id", flat=True))
+
+    # Convert list → 'MRC148','MRC149',...
+    mr_sql_list = ",".join(f"'{x}'" for x in mr_ids)
+
+    # Supervisor details
+    obj = qs.first()
+    full_name = obj.supervisor_name
+    ofc_division = obj.ofc_division
+
+    pagesize = int(request.data.get("pagesize", 10))
+    page = int(request.data.get("page", 1))
+    searchdata = request.data.get("searchdata")
+    offset = (pagesize * page) - pagesize
+
     now = datetime.now()
     month = now.month
-    clause = "where"
+
+    # ---- Dynamic WHERE clause ----
+    clause = "WHERE "
+    conditions = []
+
+    # Filter by MR IDs
+    conditions.append(f"m.mr_id IN ({mr_sql_list})")
+
+    # Month filter
+    conditions.append(f"extract(Month from reading_date_db) = '{month}'")
+
+    # Search filter
     if searchdata:
-        clause += f""" m.mr_id like '%{searchdata}%' and """
+        conditions.append(f"m.mr_id ILIKE '%{searchdata}%'")
 
-    if designation == "supervisor":
-        cursor = connection.cursor()
-        query = f"""select m.mr_id as "mrId",m.ofc_division,m.rdng_date,m.prsnt_mtr_status,m.prsnt_ocr_rdng,m.qc_req,
-    m.prsnt_rdng,m.ocr_pf_reading,m.cons_name,m.cons_ac_no,m.prsnt_md_rdng_ocr,m.rdng_ocr_status,m.rdng_img,m.prsnt_md_rdng,m.id,r."mrPhoto"
-                from readingmaster m left outer join meterreaderregistration r on m.mr_id=r."mrId" {clause} extract(Month from reading_date_db)='{month}' and ofc_zone = '{ofc_zone}' and ofc_circle = '{ofc_circle}' and ofc_division= '{ofc_division}' order by m.rdng_date DESC limit {pagesize} offset {offset}
+    # Join all with AND
+    clause += " AND ".join(conditions)
+
+    cursor = connection.cursor()
+
+    query = f"""
+        SELECT 
+            m.mr_id AS "mrId",
+            m.ofc_division,
+            m.rdng_date,
+            m.prsnt_mtr_status,
+            m.prsnt_ocr_rdng,
+            m.qc_req,
+            m.prsnt_rdng,
+            m.ocr_pf_reading,
+            m.cons_name,
+            m.cons_ac_no,
+            m.prsnt_md_rdng_ocr,
+            m.rdng_ocr_status,
+            m.rdng_img,
+            m.prsnt_md_rdng,
+            m.id,
+            r."mrPhoto"
+        FROM readingmaster m
+        LEFT JOIN meterreaderregistration r ON m.mr_id = r."mrId"
+        {clause}
+        ORDER BY m.rdng_date DESC
+        LIMIT {pagesize} OFFSET {offset}
     """
-        print("query", query)
-        cursor.execute(query)
-        person_objects = dictfetchall(cursor)
-        return Response(
-            {
-                "status": True,
-                "message": f"""{pagesize} data fetched successfully""",
-                "user_name": full_name,
-                "division": ofc_division,
-                "results": person_objects,
-            }
-        )
-    return Response({"status": False, "message": f"""You are not a Supervisor"""})
 
+    print("query -->", query)
+    cursor.execute(query)
+    result = dictfetchall(cursor)
+
+    return Response({
+        "status": True,
+        "message": f"{pagesize} data fetched successfully",
+        "user_name": full_name,
+        "division": ofc_division,
+        "results": result,
+    })
 
 # @api_view(['POST'])
 # def meterreaderDetails(request):
@@ -8087,8 +8543,26 @@ def meterreaderDetails(request):
                 if key == "bl_agnc_name":
                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
 
-                if key == "ofc_discom":
-                    conditions.append(f"ofc_discom='{data['ofc_discom']}'")
+                if key == "Discom":
+                    conditions.append(f"ofc_discom='{data['Discom']}'")
+                # if key == "ofc_discom":
+                #     conditions.append(f"ofc_discom='{data['ofc_discom']}'")
+
+                if key == "zone":
+                    conditions.append(f"ofc_zone='{data['zone']}'")
+
+                if key == "circle":
+                    conditions.append(f"ofc_circle='{data['circle']}'")
+
+                if key == "Division":
+                    conditions.append(f"ofc_division='{data['Division']}'")
+
+                if key == "Subdivision":
+                    conditions.append(
+                        f"ofc_subdivision='{data['Subdivision']}'")
+
+                if key == "Section":
+                    conditions.append(f"ofc_section='{data['Section']}'")
 
             # Join all conditions using 'AND'
             clause += " AND ".join(conditions)
@@ -8169,11 +8643,7 @@ def cons_wise_details_with_search(request):
     m.id,m.cons_name,m.cons_ac_no,cons_address,m.cons_ph_no,m.con_trf_cat,m.mr_unit,
     r."mrId",r."mrName",r."mrPhone",r."mrPhoto" as avatar,m.con_mtr_sl_no,
     m.rdng_date,m.prsnt_mtr_status,m.prsnt_md_rdng,m.ocr_pf_reading,m.abnormality,m.prsnt_rdng_ocr_excep,m.md_ocr_excep,m.mr_rmrk,m.qc_req,m.ai_mdl_ver,m.ph_name,m.cmra_res,m.andr_ver,m.reading_date_db,
-<<<<<<< HEAD
-    m.rdng_img,m.md_img,m.pf_image,m.prsnt_ocr_rdng,m.prsnt_rdng,m.prsnt_md_rdng_ocr,m.rdng_ocr_status,m.kvah_rdng,m.kvah_img
-=======
     m.rdng_img,m.md_img,m.pf_image,m.prsnt_ocr_rdng,m.prsnt_rdng,m.prsnt_md_rdng_ocr,m.rdng_ocr_status,m.kvah_rdng,m.kvah_img 
->>>>>>> b13739e6fb2488f9ba49be177003b87986e02950
       FROM
     readingmaster m left outer join meterreaderregistration r on m.mr_id=r."mrId" {clause}"""
     else:
