@@ -2,7 +2,7 @@ from datetime import date
 from django.db.models import Q, Exists, OuterRef
 from calendar import monthrange
 from django.db import DatabaseError, IntegrityError
-from api.models import SupervsiorLocation
+from api.models import SupervisorLocation
 import uuid
 from api.models import SupervisorLogin
 from rest_framework.decorators import api_view
@@ -821,7 +821,7 @@ def getregdata(request):
 
     if role_to_fetch == 'supervisor':
         today = date.today()
-        location_exists = SupervsiorLocation.objects.filter(
+        location_exists = SupervisorLocation.objects.filter(
             supervisor_number=OuterRef('supervisor_number'),
             date=today
         )
@@ -6332,7 +6332,7 @@ def supervisorlocation(request):
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO supervsiorlocation 
+                INSERT INTO SupervisorLocation 
                     (supervisor_number, geo_lat, geo_long, date)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (supervisor_number, date)
@@ -6895,7 +6895,7 @@ def clusterstestnew(request):
                 supervisor_number = mr_id_value[4:]
                 print("-------->>>>", today, supervisor_number)
                 try:
-                    locations = SupervsiorLocation.objects.filter(
+                    locations = SupervisorLocation.objects.filter(
                         supervisor_number=supervisor_number,
                         date=today
                     ).values('geo_lat', 'geo_long', 'supervisor_number', 'date')
