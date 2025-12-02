@@ -8934,14 +8934,16 @@ def cons_passed(request):
     mr_id = request.data["mrId"]
 
     cursor = connection.cursor()
-    query = f"""select distinct(rdng_ocr_status) from readingmaster where rdng_ocr_status='Passed' and cons_ac_no='{cons_ac_no}' and mr_id='{mr_id}' and manual_update_flag isnull
+    query = f"""select distinct(rdng_ocr_status) from readingmaster where rdng_ocr_status='Passed'  and cons_ac_no='{cons_ac_no}' and mr_id='{mr_id}' and manual_update_flag isnull and  qc_done !='byLambda'
     """
+
     ocrstatus = ""
     cursor.execute(query)
     result = cursor.fetchall()
     if len(result) > 0:
         if result[0][0] == "Passed":
             ocrstatus = "Passed"
+            
     else:
         ocrstatus = "THERE IS NO OCR PASSED FOR THIS CONSUMER"
 
