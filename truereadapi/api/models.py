@@ -298,3 +298,12 @@ class SupervisorLogin(models.Model):
     class Meta:
         db_table = "supervisorlogin"
 
+class SupervsiorLocation(models.Model):
+    id = models.AutoField(primary_key=True)
+    supervisor_number = models.CharField(max_length=15, unique=False)
+    geo_lat = models.CharField(max_length=300,null=True,blank=True)
+    geo_long = models.CharField(max_length=300,null=True,blank=True)
+    date = models.DateField(null=True, blank=True)
+
+    class Meta:
+        db_table = "supervsiorlocation"
