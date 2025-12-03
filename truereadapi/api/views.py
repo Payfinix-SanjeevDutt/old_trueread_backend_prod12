@@ -1,3 +1,8 @@
+from django.db import DatabaseError, IntegrityError
+from api.models import SupervsiorLocation
+import uuid
+from api.models import SupervisorLogin
+from rest_framework.decorators import api_view
 from datetime import date, timedelta
 from django.shortcuts import render
 from rest_framework.response import Response
@@ -6216,10 +6221,7 @@ def newmvsummary(request):
 #     return Response({"count": total_count, "results": results})
 
 # deepak
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from api.models import SupervisorLogin
-import uuid
+
 
 @api_view(["POST"])
 def supervisorlogin(request):
@@ -6261,9 +6263,10 @@ def supervisorlogin(request):
         }
     })
 
-#deeepak
-from api.models import SupervsiorLocation
-from django.db import DatabaseError, IntegrityError
+
+# deeepak
+
+
 @api_view(["POST"])
 def supervisorlocation(request):
     try:
@@ -6292,7 +6295,6 @@ def supervisorlocation(request):
         # Validate latitude and longitude
         geo_lat = float(geo_lat)
         geo_long = float(geo_long)
-            
 
         try:
             obj, created = SupervsiorLocation.objects.update_or_create(
@@ -6314,26 +6316,25 @@ def supervisorlocation(request):
                     "status": True,
                     "message": "location updated",
                 })
-                
+
         except IntegrityError as e:
             return Response({
                 "status": False,
                 "message": f"Database integrity error: {str(e)}"
             }, status=status.HTTP_400_BAD_REQUEST)
-            
+
         except DatabaseError as e:
             return Response({
                 "status": False,
                 "message": f"Database error: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            
+
     except Exception as e:
         return Response({
             "status": False,
             "message": f"An error occurred: {str(e)}"
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+
 
 @api_view(["POST"])
 def newmvcheck(request):
@@ -7345,21 +7346,21 @@ def qccheckmobile(request):
 def androidclusterstestnew(request):
     filters = request.data.get("filters", {})
     today = date.today()
- 
+
     where_clauses = ["reading_date_db = %s"]
     params = [str(today)]
- 
+
     # Dynamic filters
     if "mr_id" in filters:
         where_clauses.append("mr_id = %s")
         params.append(filters["mr_id"])
- 
+
     if "bl_agnc_name" in filters:
         where_clauses.append("bl_agnc_name = %s")
         params.append(filters["bl_agnc_name"])
- 
+
     where_sql = "WHERE " + " AND ".join(where_clauses)
- 
+
     query = f"""
         SELECT DISTINCT ON (mr_id)
             mr_id, rdng_date, cons_name, geo_lat, geo_long,
@@ -7370,13 +7371,14 @@ def androidclusterstestnew(request):
                  (geo_lat IS NULL OR geo_long IS NULL),  -- Prefer NOT NULL
                  rdng_date DESC                          -- Latest record
     """
- 
+
     cursor = connection.cursor()
     cursor.execute(query, params)
-    print("query:>",query)
+    print("query:>", query)
     result = dictfetchall(cursor)
- 
+
     return Response(result)
+
 
 @api_view(["POST"])
 def qcmobiledashboard(request):
@@ -7415,7 +7417,6 @@ def qcmobiledashboard(request):
 
     # Convert MR IDs to SQL list (1,2,3,...)
     mr_id_sql_list = ",".join(f"'{i}'" for i in mr_ids)
-
 
     cursor = connection.cursor()
 
@@ -7559,14 +7560,14 @@ def qcmobiledashboard(request):
 #             FROM (
 #                 SELECT
 #                     mr_id,
- 
+
 #                     -- ACTIVE status based on TODAY'S activity
 #                     CASE
 #                         WHEN COUNT(CASE WHEN reading_date_db = CURRENT_DATE THEN 1 END) > 0
 #                         THEN 'Active'
 #                         ELSE 'Inactive'
 #                     END AS status,
- 
+
 #                     -- % Passed
 #                     CASE
 #                         WHEN COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) = 0
@@ -7579,7 +7580,7 @@ def qcmobiledashboard(request):
 #                             )::numeric * 100
 #                         , 2)
 #                     END AS passed_percent,
- 
+
 #                     -- Defective %
 #                     ROUND(
 #                         (
@@ -7588,7 +7589,7 @@ def qcmobiledashboard(request):
 #                             NULLIF(COUNT(mr_id)::float, 0)
 #                         )::numeric * 100
 #                     , 2) AS meter_defective_percent,
- 
+
 #                     -- Door Locked %
 #                     ROUND(
 #                         (
@@ -7597,30 +7598,30 @@ def qcmobiledashboard(request):
 #                             NULLIF(COUNT(mr_id)::float, 0)
 #                         )::numeric * 100
 #                     , 2) AS door_locked_percent,
- 
+
 #                     COUNT(*) AS mr_total_readings,
- 
+
 #                     -- Total Passed & Failed
 #                     COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) AS totalpassed,
 #                     COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END) AS totalfailed,
- 
+
 #                     -- QC
 #                     COUNT(CASE WHEN qc_req = 'Yes' THEN 1 END) AS mr_qc_remaining,
 #                     COUNT(CASE WHEN qc_req = 'No' THEN 1 END) AS mr_qc_done,
- 
+
 #                     COUNT(*) OVER() AS mr_count
- 
+
 #                 FROM readingmaster
- 
+
 #                 WHERE
 #                     reading_date_db BETWEEN '{start_date}' AND '{end_date}'
 #                     AND ofc_zone = '{ofc_zone}'
 #                     AND ofc_circle = '{ofc_circle}'
 #                     AND ofc_division = '{ofc_division}'
- 
+
 #                 GROUP BY mr_id
 #             ) AS sub
- 
+
 #             ORDER BY passed_percent ASC, meter_defective_percent ASC
 #             LIMIT {pagesize} OFFSET {offset};
 #         """
@@ -7746,6 +7747,7 @@ def downloadexcel(request):
     response["Content-Disposition"] = "attachment; filename=mydata.xlsx"
     wb.save(response)
     return response
+
 
 @api_view(["POST"])
 def mobilemvcards(request):
@@ -9016,7 +9018,7 @@ def cons_passed(request):
     if len(result) > 0:
         if result[0][0] == "Passed":
             ocrstatus = "Passed"
-            
+
     else:
         ocrstatus = "THERE IS NO OCR PASSED FOR THIS CONSUMER"
 
