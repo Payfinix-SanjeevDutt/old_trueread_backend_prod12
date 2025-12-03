@@ -6263,79 +6263,46 @@ def supervisorlogin(request):
         }
     })
 
-
-# deeepak
-
+#deeepak
+from api.models import SupervsiorLocation
+from django.db import connection
 
 @api_view(["POST"])
 def supervisorlocation(request):
+    supervisor_number = request.data.get("supervisor_number")
+    geo_lat = request.data.get("geo_lat")
+    geo_long = request.data.get("geo_long")
+    date_str = request.data.get("date")
+
+    if not all([supervisor_number, geo_lat, geo_long, date_str]):
+        return Response({"status": False, "message": "Missing fields"}, status=400)
+
     try:
-        # Validate required fields
-        supervisor_number = request.data.get("supervisor_number")
-        geo_lat = request.data.get("geo_lat")
-        geo_long = request.data.get("geo_long")
-        date_str = request.data.get("date")   # format: "2025-11-27"
+        date = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"status": False, "message": "Invalid date"}, status=400)
 
-        # Check if all required fields are present
-        if not all([supervisor_number, geo_lat, geo_long, date_str]):
-            return Response({
-                "status": False,
-                "message": "Missing required fields: supervisor_number, geo_lat, geo_long, date"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate and convert string to date
-        try:
-            date = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except ValueError:
-            return Response({
-                "status": False,
-                "message": "Invalid date format. Expected format: YYYY-MM-DD"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Validate latitude and longitude
-        geo_lat = float(geo_lat)
-        geo_long = float(geo_long)
-
-        try:
-            obj, created = SupervsiorLocation.objects.update_or_create(
-                supervisor_number=supervisor_number,
-                date=date,
-                defaults={
-                    "geo_lat": geo_lat,
-                    "geo_long": geo_long,
-                }
-            )
-
-            if created:
-                return Response({
-                    "status": True,
-                    "message": "location added",
-                })
-            else:
-                return Response({
-                    "status": True,
-                    "message": "location updated",
-                })
-
-        except IntegrityError as e:
-            return Response({
-                "status": False,
-                "message": f"Database integrity error: {str(e)}"
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        except DatabaseError as e:
-            return Response({
-                "status": False,
-                "message": f"Database error: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO supervsiorlocation 
+                    (supervisor_number, geo_lat, geo_long, date)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (supervisor_number, date)
+                DO UPDATE SET
+                    geo_lat = EXCLUDED.geo_lat,
+                    geo_long = EXCLUDED.geo_long
+                RETURNING (xmax = 0) AS inserted
+            """, [supervisor_number, geo_lat, geo_long, date])
+            
+            result = cursor.fetchone()
+            created = result[0] if result else False
+        
+        message = "location added" if created else "location updated"
+        return Response({"status": True, "message": message})
+        
     except Exception as e:
-        return Response({
-            "status": False,
-            "message": f"An error occurred: {str(e)}"
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
+        return Response({"status": False, "message": f"Database error: {str(e)}"}, status=500)
 @api_view(["POST"])
 def newmvcheck(request):
     pagesize = request.data.get("pagesize", None)
@@ -8499,16 +8466,125 @@ ORDER BY EXTRACT(month FROM reading_date_db)"""
 
 
 # Sanjeev
+# @api_view(["POST"])
+# def meterreaderDetails(request):
+#     pagesize = request.data.get("pagesize")
+#     page = request.data.get("page")
+#     offset = (int(pagesize) * int(page)) - int(pagesize)
+
+#     import time
+
+#     start = time.time()
+
+#     data = request.data.get("filters", None)
+#     clause = ""
+#     try:
+#         if data:
+#             clause += " WHERE "
+#             conditions = []
+#             for key, value in data.items():
+#                 if key == "month":
+#                     year = value.split("-")[0]
+#                     month = value.split("-")[1]
+#                     conditions.append(
+#                         f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
+
+#                 if key == "startdate":
+#                     conditions.append(
+#                         f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
+
+#                 if key == "enddate":
+#                     conditions.append(f"'{data['enddate']}'")
+
+#                 if key == "mr_id":
+#                     conditions.append(f"mr_id='{data['mr_id']}'")
+
+#                 if key == "searchdata":
+#                     conditions.append(
+#                         f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
+
+#                 if key == "rdng_ocr_status":
+#                     conditions.append(
+#                         f"rdng_ocr_status='{data['rdng_ocr_status']}'")
+
+#                 if key == "con_trf_cat":
+#                     conditions.append(f"con_trf_cat='{value}'")
+
+#                 if key == "bl_agnc_name":
+#                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
+
+#                 if key == "Discom":
+#                     conditions.append(f"ofc_discom='{data['Discom']}'")
+#                 # if key == "ofc_discom":
+#                 #     conditions.append(f"ofc_discom='{data['ofc_discom']}'")
+
+#                 if key == "zone":
+#                     conditions.append(f"ofc_zone='{data['zone']}'")
+
+#                 if key == "circle":
+#                     conditions.append(f"ofc_circle='{data['circle']}'")
+
+#                 if key == "Division":
+#                     conditions.append(f"ofc_division='{data['Division']}'")
+
+#                 if key == "Subdivision":
+#                     conditions.append(
+#                         f"ofc_subdivision='{data['Subdivision']}'")
+
+#                 if key == "Section":
+#                     conditions.append(f"ofc_section='{data['Section']}'")
+
+#             # Join all conditions using 'AND'
+#             clause += " AND ".join(conditions)
+
+#             selected_month = data.get("month", None)
+#             today = datetime.now()
+#             this_month = today.strftime("%Y-%m")
+#             previous_month = (
+#                 today - timedelta(days=today.day)).strftime("%Y-%m")
+#             tablename = "prevmonthsdata" if selected_month not in {
+#                 this_month, previous_month} else "readingmaster"
+
+#             cursor = connection.cursor()
+#             query = f"""
+#                 SELECT mr_id, cons_ac_no, bl_agnc_name, abnormality, cons_name, con_trf_cat, con_mtr_sl_no,
+#                 mr_rmrk, prsnt_mtr_status, prsnt_rdng, prev_rdng, prsnt_md_rdng, prev_md, ocr_pf_reading,
+#                 prev_pf_rdng, rdng_date, prev_rdng_date, rdng_img, md_img, prsnt_rdng_ocr_excep,
+#                 md_ocr_excep, qc_req FROM {tablename} {clause} ORDER BY rdng_date DESC LIMIT {pagesize} OFFSET {offset}
+#                 """
+#             print("QUERY!", query)
+#             cursor.execute(query)
+#             person_objects = dictfetchall(cursor)
+
+#             query2 = f"""
+#                 SELECT COUNT(*) AS total_count FROM {tablename} {clause}
+#                 """
+#             print("QUERY!", query2)
+
+#             cursor.execute(query2)
+#             rows = cursor.fetchone()
+
+#             print(time.time() - start)
+#             return Response({"result": person_objects, "count": rows[0]})
+#         else:
+#             # No filters present, return empty response
+#             return Response({"result": [], "count": 0})
+
+#     except Exception as e:
+#         print(e)  # Log the error for debugging purposes
+#         return Response({"result": [], "count": 5})
+
+#indra
 @api_view(["POST"])
 def meterreaderDetails(request):
     pagesize = request.data.get("pagesize")
     page = request.data.get("page")
     offset = (int(pagesize) * int(page)) - int(pagesize)
-
+ 
     import time
-
+ 
     start = time.time()
-
+ 
     data = request.data.get("filters", None)
     clause = ""
     try:
@@ -8521,55 +8597,69 @@ def meterreaderDetails(request):
                     month = value.split("-")[1]
                     conditions.append(
                         f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
-
+ 
                 if key == "startdate":
                     conditions.append(
                         f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
-
+ 
                 if key == "enddate":
                     conditions.append(f"'{data['enddate']}'")
-
+ 
                 if key == "mr_id":
                     conditions.append(f"mr_id='{data['mr_id']}'")
-
+ 
                 if key == "searchdata":
                     conditions.append(
                         f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
-
+ 
                 if key == "rdng_ocr_status":
                     conditions.append(
                         f"rdng_ocr_status='{data['rdng_ocr_status']}'")
-
+                if key == "Exception":
+                    conditions.append(f"rdng_ocr_status='{value}'")
+ 
+                if key == "prsnt_rdng_ocr_excep":
+                    # CASE 1: Passed → get only passed rows
+                    if value == "Passed":
+                        conditions.append("rdng_ocr_status = 'Passed'")
+                    # CASE 2: Failed (All)
+                    elif value == "__FAILED__":
+                        # Get rows where there IS an exception (not empty, not null)
+                        conditions.append("TRIM(COALESCE(prsnt_rdng_ocr_excep, '')) <> ''")
+                    # CASE 3: Failed + Specific Reason
+                    else:
+                        conditions.append(f"prsnt_rdng_ocr_excep = '{value}'")
+ 
                 if key == "con_trf_cat":
                     conditions.append(f"con_trf_cat='{value}'")
-
+ 
                 if key == "bl_agnc_name":
                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
-
+ 
                 if key == "Discom":
                     conditions.append(f"ofc_discom='{data['Discom']}'")
                 # if key == "ofc_discom":
                 #     conditions.append(f"ofc_discom='{data['ofc_discom']}'")
-
+ 
                 if key == "zone":
                     conditions.append(f"ofc_zone='{data['zone']}'")
-
+ 
                 if key == "circle":
                     conditions.append(f"ofc_circle='{data['circle']}'")
-
+ 
                 if key == "Division":
                     conditions.append(f"ofc_division='{data['Division']}'")
-
+ 
                 if key == "Subdivision":
                     conditions.append(
                         f"ofc_subdivision='{data['Subdivision']}'")
-
+ 
                 if key == "Section":
                     conditions.append(f"ofc_section='{data['Section']}'")
-
+ 
             # Join all conditions using 'AND'
             clause += " AND ".join(conditions)
-
+ 
             selected_month = data.get("month", None)
             today = datetime.now()
             this_month = today.strftime("%Y-%m")
@@ -8577,36 +8667,40 @@ def meterreaderDetails(request):
                 today - timedelta(days=today.day)).strftime("%Y-%m")
             tablename = "prevmonthsdata" if selected_month not in {
                 this_month, previous_month} else "readingmaster"
-
+ 
             cursor = connection.cursor()
             query = f"""
                 SELECT mr_id, cons_ac_no, bl_agnc_name, abnormality, cons_name, con_trf_cat, con_mtr_sl_no,
                 mr_rmrk, prsnt_mtr_status, prsnt_rdng, prev_rdng, prsnt_md_rdng, prev_md, ocr_pf_reading,
-                prev_pf_rdng, rdng_date, prev_rdng_date, rdng_img, md_img, prsnt_rdng_ocr_excep,
+                prev_pf_rdng, rdng_date, prev_rdng_date, rdng_img, md_img, rdng_ocr_status,
+                CASE
+                    WHEN rdng_ocr_status = 'Passed' THEN 'Passed'
+                    ELSE COALESCE(NULLIF(TRIM(prsnt_rdng_ocr_excep), ''), '')
+                END AS prsnt_rdng_ocr_excep,
                 md_ocr_excep, qc_req FROM {tablename} {clause} ORDER BY rdng_date DESC LIMIT {pagesize} OFFSET {offset}
                 """
             print("QUERY!", query)
             cursor.execute(query)
             person_objects = dictfetchall(cursor)
-
+ 
             query2 = f"""
                 SELECT COUNT(*) AS total_count FROM {tablename} {clause}
                 """
             print("QUERY!", query2)
-
+ 
             cursor.execute(query2)
             rows = cursor.fetchone()
-
+ 
             print(time.time() - start)
             return Response({"result": person_objects, "count": rows[0]})
         else:
             # No filters present, return empty response
             return Response({"result": [], "count": 0})
-
+ 
     except Exception as e:
         print(e)  # Log the error for debugging purposes
         return Response({"result": [], "count": 5})
-
+ 
 
 @api_view(["POST"])
 def cons_wise_details_with_search(request):
