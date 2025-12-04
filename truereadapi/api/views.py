@@ -6671,7 +6671,7 @@ def clusterstestnew(request):
 
         cursor = connection.cursor()
         query = f"""
-        select mr_id,rdng_date,cons_name,geo_lat,geo_long,prsnt_mtr_status,rdng_ocr_status,
+        select mr_id,rdng_date,cons_name,geo_lat,geo_long,prsnt_mtr_status,rdng_ocr_status,prsnt_ocr_rdng,ocr_pf_reading,cons_ac_no,prsnt_md_rdng_ocr,prsnt_md_rdng,prsnt_rdng,qc_req,
         rdng_img from readingmaster {clause} AND reading_date_db='{today}'
         """
         print(query)
