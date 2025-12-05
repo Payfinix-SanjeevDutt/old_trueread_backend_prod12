@@ -16,6 +16,7 @@ from .serializers import (
     MridSerializer,
     Serail,
     ConsumersMeterRegistration,
+    SupervisorLoginSerializer,
     UserManagementSerializer,
 )
 from django.db.models import Q
@@ -804,11 +805,35 @@ def metereReaderlogin(request):
         )
 
 
+from django.db.models import Q, Exists, OuterRef
+from datetime import date
+
 @api_view(["GET"])
 def getregdata(request):
-    data = MeterReaderRegistration.objects.all()
-    serializer = MeterReaderRegistrationSerializer(data, many=True)
-    return Response(serializer.data)
+    role_to_fetch = request.query_params.get('role', 'meterreader').lower()
+    
+    if role_to_fetch == 'supervisor':
+        today = date.today()
+        
+        # Subquery to check if location exists for today
+        location_exists = SupervsiorLocation.objects.filter(
+            supervisor_number=OuterRef('supervisor_number'),
+            date=today
+        )
+        
+        # Annotate with location field
+        data = SupervisorLogin.objects.filter(
+            id__in=SupervisorLogin.objects.values('supervisor_number').distinct().values_list('id', flat=True)
+        ).annotate(
+            location=Exists(location_exists)
+        ).distinct('supervisor_number')
+        
+        serializer = SupervisorLoginSerializer(data, many=True)
+        return Response(serializer.data)
+    else:
+        data = MeterReaderRegistration.objects.all()
+        serializer = MeterReaderRegistrationSerializer(data, many=True)
+        return Response(serializer.data)
 
 
 @api_view(["GET"])
@@ -6659,7 +6684,38 @@ def clusterstestnew(request):
     clause = ""
     # try:
     if data:
-        # print("rtyui")
+        #this below code is for supervisor location
+        if "mr_id" in data :
+            mr_id_value = data["mr_id"]
+            if mr_id_value.startswith('SUP_'):
+                supervisor_number = mr_id_value[4:]
+                print("-------->>>>", today, supervisor_number)
+                try:
+                    locations = SupervsiorLocation.objects.filter(
+                        supervisor_number=supervisor_number,
+                        date=today
+                    ).values('geo_lat', 'geo_long', 'supervisor_number', 'date')
+
+                    supervisor_login_data = None
+                    if locations:
+                        supervisor_login_data = SupervisorLogin.objects.filter(
+                            supervisor_number=supervisor_number
+                        ).values('supervisor_name', 'ofc_division', 'ofc_subdivision').first()
+                    
+                    print("location type", type(locations))
+                    location_list = list(locations)
+                    
+                    # Add supervisor_login_data to each location in the list
+                    if supervisor_login_data:
+                        for location in location_list:
+                            location.update(supervisor_login_data)
+                    
+                    return Response(location_list)
+                    
+                except Exception as e:
+                    print(f"Database query error: {e}")
+
+        
         clause += "WHERE "
         for i, (key, value) in enumerate(data.items()):
             if i > 0:
