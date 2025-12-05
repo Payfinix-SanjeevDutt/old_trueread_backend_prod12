@@ -25,6 +25,7 @@ class MeterReaderRegistrationSerializer(serializers.ModelSerializer):
         fields = ['id','mrId','mrName','section','mrPhone','mrPhoto','androidToken','discom','zone','circle','division','subdivision','sectioncode']
 
 class SupervisorLoginSerializer(serializers.ModelSerializer):
+    location = serializers.BooleanField(read_only=True)
     class Meta:
         model = SupervisorLogin
         fields = [
@@ -34,6 +35,7 @@ class SupervisorLoginSerializer(serializers.ModelSerializer):
             'ofc_subdivision',
             'supervisor_name',
             'is_admin',
+            'location',
         ]    
 
 class ConsumerDataSerializer(serializers.ModelSerializer):
