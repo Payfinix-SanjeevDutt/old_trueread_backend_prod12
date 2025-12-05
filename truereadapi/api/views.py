@@ -8632,6 +8632,9 @@ def meterreaderDetails(request):
  
                 if key == "con_trf_cat":
                     conditions.append(f"con_trf_cat='{value}'")
+                
+                if key == 'prsnt_mtr_status':
+                    conditions.append(f"prsnt_mtr_status='{value}'")
  
                 if key == "bl_agnc_name":
                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
