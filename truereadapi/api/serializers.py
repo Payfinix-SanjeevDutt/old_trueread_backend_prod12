@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Consumers,MeterReaderRegistration,UserManagement,NotificationMani,notificatio_recepients
+from .models import Consumers,MeterReaderRegistration, SupervisorLogin,UserManagement,NotificationMani,notificatio_recepients
 from django.utils.encoding import smart_str,force_bytes,DjangoUnicodeDecodeError
 from django.utils.http import urlsafe_base64_encode,urlsafe_base64_decode
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -23,7 +23,18 @@ class MeterReaderRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = MeterReaderRegistration
         fields = ['id','mrId','mrName','section','mrPhone','mrPhoto','androidToken','discom','zone','circle','division','subdivision','sectioncode']
-        
+
+class SupervisorLoginSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SupervisorLogin
+        fields = [
+            'id',
+            'supervisor_number',
+            'ofc_division',
+            'ofc_subdivision',
+            'supervisor_name',
+            'is_admin',
+        ]    
 
 class ConsumerDataSerializer(serializers.ModelSerializer):
     class Meta:

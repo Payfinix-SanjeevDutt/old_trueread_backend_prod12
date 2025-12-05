@@ -11,6 +11,7 @@ from .serializers import (
     MridSerializer,
     Serail,
     ConsumersMeterRegistration,
+    SupervisorLoginSerializer,
     UserManagementSerializer,
 )
 from django.db.models import Q
@@ -801,9 +802,15 @@ def metereReaderlogin(request):
 
 @api_view(["GET"])
 def getregdata(request):
-    data = MeterReaderRegistration.objects.all()
-    serializer = MeterReaderRegistrationSerializer(data, many=True)
-    return Response(serializer.data)
+    role_to_fetch = request.query_params.get('role', 'meterreader').lower()
+    if role_to_fetch == 'supervisor':
+        data = SupervisorLogin.objects.distinct('supervisor_number')
+        serializer = SupervisorLoginSerializer(data,many = True)
+        return Response(serializer.data)
+    else:
+        data = MeterReaderRegistration.objects.all()
+        serializer = MeterReaderRegistrationSerializer(data, many=True)
+        return Response(serializer.data)
 
 
 @api_view(["GET"])
