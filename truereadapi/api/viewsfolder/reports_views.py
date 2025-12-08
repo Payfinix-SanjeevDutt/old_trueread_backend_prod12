@@ -2315,44 +2315,123 @@ def okprevmonbutfailednow(request):
 @api_view(['POST'])
 def custom_sbpdcl_mrreports(request):
     data = request.data
+    
+    # 1. Extract inputs
     start_date = data.get("start_date")
     end_date = data.get("end_date")
     page = int(data.get("page", 1))
     pagesize = int(data.get("pagesize", 20))
-    ofc_discom = data.get("ofc_discom", "SBPDCL")
- 
+    
+    # Handle both "discom" (from your JSON) and "ofc_discom" keys safely
+    ofc_discom = data.get("discom") or data.get("ofc_discom") or "SBPDCL"
+    
+    # Extract Location Filters
+    req_zone = data.get("zone")
+    req_circle = data.get("circle")
+    req_division = data.get("division")
+    req_subdivision = data.get("subdivision")
+    req_section = data.get("section")
+
     if not start_date or not end_date:
         return Response({"error": "start_date and end_date are required"}, status=400)
+
     offset = (page - 1) * pagesize
     table_name = "readingmaster"
+    
+    # 2. Initialize Base Parameters (Order matches the %s in the WHERE clause base)
+    params = [ofc_discom, start_date, end_date]
+    clause = ""
+
+    # 3. Dynamic Clause Construction
+    # We check if the variable exists AND is not an empty string
+    if req_zone:
+        clause += " AND ofc_zone = %s "
+        params.append(req_zone)
+        
+    if req_circle:
+        clause += " AND ofc_circle = %s "
+        params.append(req_circle)
+        
+    if req_division:
+        clause += " AND ofc_division = %s "
+        params.append(req_division)
+        
+    if req_subdivision:
+        clause += " AND ofc_subdivision = %s "
+        params.append(req_subdivision)
+        
+    if req_section:
+        # print("++++++++++++++++",req_section)
+        clause += " AND ofc_section = %s "
+        params.append(req_section)
+
+    # 4. Save parameters for the Count Query (before adding limit/offset)
+    count_params = list(params)
+
+    # 5. Add Limit/Offset for the Main Query
+    params.extend([pagesize, offset])
+
     cursor = connection.cursor()
+
+    # 6. Main Query
     query = f"""
             WITH stats AS (
                 SELECT
-                    mr_id,COUNT(*) AS total_readings,COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Ok') AS ok_count,COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Meter Defective') AS MD_count,COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Door Locked') AS DL_count,COUNT(*) FILTER (WHERE rdng_ocr_status = 'Passed' AND prsnt_mtr_status = 'Ok') AS Passed_count,COUNT(*) FILTER (WHERE rdng_ocr_status = 'Failed' AND prsnt_mtr_status = 'Ok') AS Failed_count
+                    mr_id,
+                    COUNT(*) AS total_readings,
+                    COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Ok') AS ok_count,
+                    COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Meter Defective') AS MD_count,
+                    COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Door Locked') AS DL_count,
+                    COUNT(*) FILTER (WHERE rdng_ocr_status = 'Passed' AND prsnt_mtr_status = 'Ok') AS Passed_count,
+                    COUNT(*) FILTER (WHERE rdng_ocr_status = 'Failed' AND prsnt_mtr_status = 'Ok') AS Failed_count
                 FROM {table_name}
-                WHERE ofc_discom = %s AND reading_date_db::date BETWEEN %s AND %s AND mr_id <> '' AND LENGTH(mr_id) > 5 GROUP BY mr_id
+                WHERE ofc_discom = %s 
+                  AND reading_date_db::date BETWEEN %s AND %s 
+                  AND mr_id <> '' AND LENGTH(mr_id) > 5 
+                  {clause} 
+                GROUP BY mr_id
             )
             SELECT
-                mr_id,total_readings,ok_count,ROUND(100.0 * ok_count / NULLIF(total_readings, 0), 2) AS pct_ok,MD_count,ROUND(100.0 * MD_count / NULLIF(total_readings, 0), 2) AS pct_meter_defective,DL_count,ROUND(100.0 * DL_count / NULLIF(total_readings, 0), 2) AS pct_door_locked,Passed_count,ROUND(100.0 * Passed_count / NULLIF(ok_count, 0), 2) AS pct_ocr_without_exception,Failed_count,ROUND(100.0 * Failed_count / NULLIF(ok_count, 0), 2) AS pct_ocr_with_exception
+                mr_id,
+                total_readings,
+                ok_count,
+                ROUND(100.0 * ok_count / NULLIF(total_readings, 0), 2) AS pct_ok,
+                MD_count,
+                ROUND(100.0 * MD_count / NULLIF(total_readings, 0), 2) AS pct_meter_defective,
+                DL_count,
+                ROUND(100.0 * DL_count / NULLIF(total_readings, 0), 2) AS pct_door_locked,
+                Passed_count,
+                ROUND(100.0 * Passed_count / NULLIF(ok_count, 0), 2) AS pct_ocr_without_exception,
+                Failed_count,
+                ROUND(100.0 * Failed_count / NULLIF(ok_count, 0), 2) AS pct_ocr_with_exception
             FROM stats ORDER BY mr_id LIMIT %s OFFSET %s;
     """
-    params = [ofc_discom, start_date, end_date, pagesize, offset]
+
     cursor.execute(query, params)
     results = dictfetchall(cursor)
+
+    # Debugging: Print valid SQL
     final_sql = query
     for p in params:
         final_sql = final_sql.replace("%s", f"'{p}'", 1)
-    print("Query:-->",final_sql)
+    # print("Query:-->", final_sql)
+
+    # 7. Count Query (Using the specific count_params list)
     count_sql = f"""
         SELECT COUNT(*)
         FROM (
-            SELECT mr_id FROM {table_name} WHERE ofc_discom = %s AND DATE(reading_date_db) BETWEEN %s AND %s  and mr_id <> '' AND LENGTH(mr_id) > 5 GROUP BY mr_id) AS t;
+            SELECT mr_id FROM {table_name} 
+            WHERE ofc_discom = %s AND DATE(reading_date_db) BETWEEN %s AND %s 
+            {clause} 
+            AND mr_id <> '' AND LENGTH(mr_id) > 5 
+            GROUP BY mr_id
+        ) AS t;
     """
-    cursor.execute(count_sql, [ofc_discom, start_date, end_date])
+    
+    cursor.execute(count_sql, count_params)
     total_count = cursor.fetchone()[0]
     total_pages = (total_count + pagesize - 1) // pagesize
- 
+
     return Response({
         "status": True,
         "page": page,
@@ -2362,8 +2441,6 @@ def custom_sbpdcl_mrreports(request):
         "data_count": len(results),
         "data": results,
     })
-     
-
 
 #sbpdcl
 @api_view(["POST"])

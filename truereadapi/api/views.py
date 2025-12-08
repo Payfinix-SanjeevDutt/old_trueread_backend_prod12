@@ -814,21 +814,31 @@ def getregdata(request):
     
     if role_to_fetch == 'supervisor':
         today = date.today()
-        
-        # Subquery to check if location exists for today
         location_exists = SupervsiorLocation.objects.filter(
             supervisor_number=OuterRef('supervisor_number'),
             date=today
         )
-        
-        # Annotate with location field
-        data = SupervisorLogin.objects.filter(
-            id__in=SupervisorLogin.objects.values('supervisor_number').distinct().values_list('id', flat=True)
-        ).annotate(
-            location=Exists(location_exists)
-        ).distinct('supervisor_number')
-        
-        serializer = SupervisorLoginSerializer(data, many=True)
+
+        # Step 1: Valid Postgres DISTINCT ON query
+        qs = (
+            SupervisorLogin.objects
+            .filter(
+                id__in=SupervisorLogin.objects.values('supervisor_number')
+                .distinct()
+                .values_list('id', flat=True)
+            )
+            .annotate(location=Exists(location_exists))
+            .order_by('supervisor_number', '-location')   # must match DISTINCT ON rule
+            .distinct('supervisor_number')
+        )
+
+        # Step 2: force evaluation
+        result = list(qs)
+
+        # Step 3: Python sort → location=True first
+        result.sort(key=lambda x: not x.location)
+
+        serializer = SupervisorLoginSerializer(result, many=True)
         return Response(serializer.data)
     else:
         data = MeterReaderRegistration.objects.all()
