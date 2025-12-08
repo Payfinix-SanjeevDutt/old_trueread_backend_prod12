@@ -17,11 +17,10 @@ Resources:
       # Handler is defined in Dockerfile CMD, but keep it here for reference
       # Events define how the function is triggered
       Events:
-        HttpApi:
-          Type: HttpApi
+        ApiGateway:
+          Type: Api
           Properties:
-            # Catch-all path to route all incoming HTTP requests to Django
-            Path: /{proxy+} 
+            Path: /{proxy+}
             Method: ANY
     Metadata:
       # Tell SAM how to build the Docker image
