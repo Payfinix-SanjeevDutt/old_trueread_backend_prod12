@@ -1,3 +1,8 @@
+from django.db import DatabaseError, IntegrityError
+from api.models import SupervsiorLocation
+import uuid
+from api.models import SupervisorLogin
+from rest_framework.decorators import api_view
 from datetime import date, timedelta
 from django.shortcuts import render
 from rest_framework.response import Response
@@ -11,6 +16,7 @@ from .serializers import (
     MridSerializer,
     Serail,
     ConsumersMeterRegistration,
+    SupervisorLoginSerializer,
     UserManagementSerializer,
 )
 from django.db.models import Q
@@ -799,11 +805,35 @@ def metereReaderlogin(request):
         )
 
 
+from django.db.models import Q, Exists, OuterRef
+from datetime import date
+
 @api_view(["GET"])
 def getregdata(request):
-    data = MeterReaderRegistration.objects.all()
-    serializer = MeterReaderRegistrationSerializer(data, many=True)
-    return Response(serializer.data)
+    role_to_fetch = request.query_params.get('role', 'meterreader').lower()
+    
+    if role_to_fetch == 'supervisor':
+        today = date.today()
+        
+        # Subquery to check if location exists for today
+        location_exists = SupervsiorLocation.objects.filter(
+            supervisor_number=OuterRef('supervisor_number'),
+            date=today
+        )
+        
+        # Annotate with location field
+        data = SupervisorLogin.objects.filter(
+            id__in=SupervisorLogin.objects.values('supervisor_number').distinct().values_list('id', flat=True)
+        ).annotate(
+            location=Exists(location_exists)
+        ).distinct('supervisor_number')
+        
+        serializer = SupervisorLoginSerializer(data, many=True)
+        return Response(serializer.data)
+    else:
+        data = MeterReaderRegistration.objects.all()
+        serializer = MeterReaderRegistrationSerializer(data, many=True)
+        return Response(serializer.data)
 
 
 @api_view(["GET"])
@@ -6216,10 +6246,7 @@ def newmvsummary(request):
 #     return Response({"count": total_count, "results": results})
 
 # deepak
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from api.models import SupervisorLogin
-import uuid
+
 
 @api_view(["POST"])
 def supervisorlogin(request):
@@ -6657,7 +6684,38 @@ def clusterstestnew(request):
     clause = ""
     # try:
     if data:
-        # print("rtyui")
+        #this below code is for supervisor location
+        if "mr_id" in data :
+            mr_id_value = data["mr_id"]
+            if mr_id_value.startswith('SUP_'):
+                supervisor_number = mr_id_value[4:]
+                print("-------->>>>", today, supervisor_number)
+                try:
+                    locations = SupervsiorLocation.objects.filter(
+                        supervisor_number=supervisor_number,
+                        date=today
+                    ).values('geo_lat', 'geo_long', 'supervisor_number', 'date')
+
+                    supervisor_login_data = None
+                    if locations:
+                        supervisor_login_data = SupervisorLogin.objects.filter(
+                            supervisor_number=supervisor_number
+                        ).values('supervisor_name', 'ofc_division', 'ofc_subdivision').first()
+                    
+                    print("location type", type(locations))
+                    location_list = list(locations)
+                    
+                    # Add supervisor_login_data to each location in the list
+                    if supervisor_login_data:
+                        for location in location_list:
+                            location.update(supervisor_login_data)
+                    
+                    return Response(location_list)
+                    
+                except Exception as e:
+                    print(f"Database query error: {e}")
+
+        
         clause += "WHERE "
         for i, (key, value) in enumerate(data.items()):
             if i > 0:
@@ -6669,7 +6727,7 @@ def clusterstestnew(request):
 
         cursor = connection.cursor()
         query = f"""
-        select mr_id,rdng_date,cons_name,geo_lat,geo_long,prsnt_mtr_status,rdng_ocr_status,
+        select mr_id,rdng_date,cons_name,geo_lat,geo_long,prsnt_mtr_status,rdng_ocr_status,prsnt_ocr_rdng,ocr_pf_reading,cons_ac_no,prsnt_md_rdng_ocr,prsnt_md_rdng,prsnt_rdng,qc_req,
         rdng_img from readingmaster {clause} AND reading_date_db='{today}'
         """
         print(query)
@@ -7311,21 +7369,21 @@ def qccheckmobile(request):
 def androidclusterstestnew(request):
     filters = request.data.get("filters", {})
     today = date.today()
- 
+
     where_clauses = ["reading_date_db = %s"]
     params = [str(today)]
- 
+
     # Dynamic filters
     if "mr_id" in filters:
         where_clauses.append("mr_id = %s")
         params.append(filters["mr_id"])
- 
+
     if "bl_agnc_name" in filters:
         where_clauses.append("bl_agnc_name = %s")
         params.append(filters["bl_agnc_name"])
- 
+
     where_sql = "WHERE " + " AND ".join(where_clauses)
- 
+
     query = f"""
         SELECT DISTINCT ON (mr_id)
             mr_id, rdng_date, cons_name, geo_lat, geo_long,
@@ -7336,13 +7394,14 @@ def androidclusterstestnew(request):
                  (geo_lat IS NULL OR geo_long IS NULL),  -- Prefer NOT NULL
                  rdng_date DESC                          -- Latest record
     """
- 
+
     cursor = connection.cursor()
     cursor.execute(query, params)
-    print("query:>",query)
+    print("query:>", query)
     result = dictfetchall(cursor)
- 
+
     return Response(result)
+
 
 @api_view(["POST"])
 def qcmobiledashboard(request):
@@ -7381,7 +7440,6 @@ def qcmobiledashboard(request):
 
     # Convert MR IDs to SQL list (1,2,3,...)
     mr_id_sql_list = ",".join(f"'{i}'" for i in mr_ids)
-
 
     cursor = connection.cursor()
 
@@ -7525,14 +7583,14 @@ def qcmobiledashboard(request):
 #             FROM (
 #                 SELECT
 #                     mr_id,
- 
+
 #                     -- ACTIVE status based on TODAY'S activity
 #                     CASE
 #                         WHEN COUNT(CASE WHEN reading_date_db = CURRENT_DATE THEN 1 END) > 0
 #                         THEN 'Active'
 #                         ELSE 'Inactive'
 #                     END AS status,
- 
+
 #                     -- % Passed
 #                     CASE
 #                         WHEN COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END) = 0
@@ -7545,7 +7603,7 @@ def qcmobiledashboard(request):
 #                             )::numeric * 100
 #                         , 2)
 #                     END AS passed_percent,
- 
+
 #                     -- Defective %
 #                     ROUND(
 #                         (
@@ -7554,7 +7612,7 @@ def qcmobiledashboard(request):
 #                             NULLIF(COUNT(mr_id)::float, 0)
 #                         )::numeric * 100
 #                     , 2) AS meter_defective_percent,
- 
+
 #                     -- Door Locked %
 #                     ROUND(
 #                         (
@@ -7563,30 +7621,30 @@ def qcmobiledashboard(request):
 #                             NULLIF(COUNT(mr_id)::float, 0)
 #                         )::numeric * 100
 #                     , 2) AS door_locked_percent,
- 
+
 #                     COUNT(*) AS mr_total_readings,
- 
+
 #                     -- Total Passed & Failed
 #                     COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END) AS totalpassed,
 #                     COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END) AS totalfailed,
- 
+
 #                     -- QC
 #                     COUNT(CASE WHEN qc_req = 'Yes' THEN 1 END) AS mr_qc_remaining,
 #                     COUNT(CASE WHEN qc_req = 'No' THEN 1 END) AS mr_qc_done,
- 
+
 #                     COUNT(*) OVER() AS mr_count
- 
+
 #                 FROM readingmaster
- 
+
 #                 WHERE
 #                     reading_date_db BETWEEN '{start_date}' AND '{end_date}'
 #                     AND ofc_zone = '{ofc_zone}'
 #                     AND ofc_circle = '{ofc_circle}'
 #                     AND ofc_division = '{ofc_division}'
- 
+
 #                 GROUP BY mr_id
 #             ) AS sub
- 
+
 #             ORDER BY passed_percent ASC, meter_defective_percent ASC
 #             LIMIT {pagesize} OFFSET {offset};
 #         """
@@ -7712,6 +7770,7 @@ def downloadexcel(request):
     response["Content-Disposition"] = "attachment; filename=mydata.xlsx"
     wb.save(response)
     return response
+
 
 @api_view(["POST"])
 def mobilemvcards(request):
@@ -8463,16 +8522,125 @@ ORDER BY EXTRACT(month FROM reading_date_db)"""
 
 
 # Sanjeev
+# @api_view(["POST"])
+# def meterreaderDetails(request):
+#     pagesize = request.data.get("pagesize")
+#     page = request.data.get("page")
+#     offset = (int(pagesize) * int(page)) - int(pagesize)
+
+#     import time
+
+#     start = time.time()
+
+#     data = request.data.get("filters", None)
+#     clause = ""
+#     try:
+#         if data:
+#             clause += " WHERE "
+#             conditions = []
+#             for key, value in data.items():
+#                 if key == "month":
+#                     year = value.split("-")[0]
+#                     month = value.split("-")[1]
+#                     conditions.append(
+#                         f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
+
+#                 if key == "startdate":
+#                     conditions.append(
+#                         f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
+
+#                 if key == "enddate":
+#                     conditions.append(f"'{data['enddate']}'")
+
+#                 if key == "mr_id":
+#                     conditions.append(f"mr_id='{data['mr_id']}'")
+
+#                 if key == "searchdata":
+#                     conditions.append(
+#                         f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
+
+#                 if key == "rdng_ocr_status":
+#                     conditions.append(
+#                         f"rdng_ocr_status='{data['rdng_ocr_status']}'")
+
+#                 if key == "con_trf_cat":
+#                     conditions.append(f"con_trf_cat='{value}'")
+
+#                 if key == "bl_agnc_name":
+#                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
+
+#                 if key == "Discom":
+#                     conditions.append(f"ofc_discom='{data['Discom']}'")
+#                 # if key == "ofc_discom":
+#                 #     conditions.append(f"ofc_discom='{data['ofc_discom']}'")
+
+#                 if key == "zone":
+#                     conditions.append(f"ofc_zone='{data['zone']}'")
+
+#                 if key == "circle":
+#                     conditions.append(f"ofc_circle='{data['circle']}'")
+
+#                 if key == "Division":
+#                     conditions.append(f"ofc_division='{data['Division']}'")
+
+#                 if key == "Subdivision":
+#                     conditions.append(
+#                         f"ofc_subdivision='{data['Subdivision']}'")
+
+#                 if key == "Section":
+#                     conditions.append(f"ofc_section='{data['Section']}'")
+
+#             # Join all conditions using 'AND'
+#             clause += " AND ".join(conditions)
+
+#             selected_month = data.get("month", None)
+#             today = datetime.now()
+#             this_month = today.strftime("%Y-%m")
+#             previous_month = (
+#                 today - timedelta(days=today.day)).strftime("%Y-%m")
+#             tablename = "prevmonthsdata" if selected_month not in {
+#                 this_month, previous_month} else "readingmaster"
+
+#             cursor = connection.cursor()
+#             query = f"""
+#                 SELECT mr_id, cons_ac_no, bl_agnc_name, abnormality, cons_name, con_trf_cat, con_mtr_sl_no,
+#                 mr_rmrk, prsnt_mtr_status, prsnt_rdng, prev_rdng, prsnt_md_rdng, prev_md, ocr_pf_reading,
+#                 prev_pf_rdng, rdng_date, prev_rdng_date, rdng_img, md_img, prsnt_rdng_ocr_excep,
+#                 md_ocr_excep, qc_req FROM {tablename} {clause} ORDER BY rdng_date DESC LIMIT {pagesize} OFFSET {offset}
+#                 """
+#             print("QUERY!", query)
+#             cursor.execute(query)
+#             person_objects = dictfetchall(cursor)
+
+#             query2 = f"""
+#                 SELECT COUNT(*) AS total_count FROM {tablename} {clause}
+#                 """
+#             print("QUERY!", query2)
+
+#             cursor.execute(query2)
+#             rows = cursor.fetchone()
+
+#             print(time.time() - start)
+#             return Response({"result": person_objects, "count": rows[0]})
+#         else:
+#             # No filters present, return empty response
+#             return Response({"result": [], "count": 0})
+
+#     except Exception as e:
+#         print(e)  # Log the error for debugging purposes
+#         return Response({"result": [], "count": 5})
+
+#indra
 @api_view(["POST"])
 def meterreaderDetails(request):
     pagesize = request.data.get("pagesize")
     page = request.data.get("page")
     offset = (int(pagesize) * int(page)) - int(pagesize)
-
+ 
     import time
-
+ 
     start = time.time()
-
+ 
     data = request.data.get("filters", None)
     clause = ""
     try:
@@ -8485,55 +8653,72 @@ def meterreaderDetails(request):
                     month = value.split("-")[1]
                     conditions.append(
                         f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
-
+ 
                 if key == "startdate":
                     conditions.append(
                         f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
-
+ 
                 if key == "enddate":
                     conditions.append(f"'{data['enddate']}'")
-
+ 
                 if key == "mr_id":
                     conditions.append(f"mr_id='{data['mr_id']}'")
-
+ 
                 if key == "searchdata":
                     conditions.append(
                         f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
-
+ 
                 if key == "rdng_ocr_status":
                     conditions.append(
                         f"rdng_ocr_status='{data['rdng_ocr_status']}'")
-
+                if key == "Exception":
+                    conditions.append(f"rdng_ocr_status='{value}'")
+ 
+                if key == "prsnt_rdng_ocr_excep":
+                    # CASE 1: Passed → get only passed rows
+                    if value == "Passed":
+                        conditions.append("rdng_ocr_status = 'Passed'")
+                    # CASE 2: Failed (All)
+                    elif value == "__FAILED__":
+                        # Get rows where there IS an exception (not empty, not null)
+                        conditions.append("TRIM(COALESCE(prsnt_rdng_ocr_excep, '')) <> ''")
+                    # CASE 3: Failed + Specific Reason
+                    else:
+                        conditions.append(f"prsnt_rdng_ocr_excep = '{value}'")
+ 
                 if key == "con_trf_cat":
                     conditions.append(f"con_trf_cat='{value}'")
-
+                
+                if key == 'prsnt_mtr_status':
+                    conditions.append(f"prsnt_mtr_status='{value}'")
+ 
                 if key == "bl_agnc_name":
                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
-
+ 
                 if key == "Discom":
                     conditions.append(f"ofc_discom='{data['Discom']}'")
                 # if key == "ofc_discom":
                 #     conditions.append(f"ofc_discom='{data['ofc_discom']}'")
-
+ 
                 if key == "zone":
                     conditions.append(f"ofc_zone='{data['zone']}'")
-
+ 
                 if key == "circle":
                     conditions.append(f"ofc_circle='{data['circle']}'")
-
+ 
                 if key == "Division":
                     conditions.append(f"ofc_division='{data['Division']}'")
-
+ 
                 if key == "Subdivision":
                     conditions.append(
                         f"ofc_subdivision='{data['Subdivision']}'")
-
+ 
                 if key == "Section":
                     conditions.append(f"ofc_section='{data['Section']}'")
-
+ 
             # Join all conditions using 'AND'
             clause += " AND ".join(conditions)
-
+ 
             selected_month = data.get("month", None)
             today = datetime.now()
             this_month = today.strftime("%Y-%m")
@@ -8541,36 +8726,40 @@ def meterreaderDetails(request):
                 today - timedelta(days=today.day)).strftime("%Y-%m")
             tablename = "prevmonthsdata" if selected_month not in {
                 this_month, previous_month} else "readingmaster"
-
+ 
             cursor = connection.cursor()
             query = f"""
                 SELECT mr_id, cons_ac_no, bl_agnc_name, abnormality, cons_name, con_trf_cat, con_mtr_sl_no,
                 mr_rmrk, prsnt_mtr_status, prsnt_rdng, prev_rdng, prsnt_md_rdng, prev_md, ocr_pf_reading,
-                prev_pf_rdng, rdng_date, prev_rdng_date, rdng_img, md_img, prsnt_rdng_ocr_excep,
+                prev_pf_rdng, rdng_date, prev_rdng_date, rdng_img, md_img, rdng_ocr_status,
+                CASE
+                    WHEN rdng_ocr_status = 'Passed' THEN 'Passed'
+                    ELSE COALESCE(NULLIF(TRIM(prsnt_rdng_ocr_excep), ''), '')
+                END AS prsnt_rdng_ocr_excep,
                 md_ocr_excep, qc_req FROM {tablename} {clause} ORDER BY rdng_date DESC LIMIT {pagesize} OFFSET {offset}
                 """
             print("QUERY!", query)
             cursor.execute(query)
             person_objects = dictfetchall(cursor)
-
+ 
             query2 = f"""
                 SELECT COUNT(*) AS total_count FROM {tablename} {clause}
                 """
             print("QUERY!", query2)
-
+ 
             cursor.execute(query2)
             rows = cursor.fetchone()
-
+ 
             print(time.time() - start)
             return Response({"result": person_objects, "count": rows[0]})
         else:
             # No filters present, return empty response
             return Response({"result": [], "count": 0})
-
+ 
     except Exception as e:
         print(e)  # Log the error for debugging purposes
         return Response({"result": [], "count": 5})
-
+ 
 
 @api_view(["POST"])
 def cons_wise_details_with_search(request):
@@ -8973,14 +9162,16 @@ def cons_passed(request):
     mr_id = request.data["mrId"]
 
     cursor = connection.cursor()
-    query = f"""select distinct(rdng_ocr_status) from readingmaster where rdng_ocr_status='Passed' and cons_ac_no='{cons_ac_no}' and mr_id='{mr_id}' and manual_update_flag isnull
+    query = f"""select distinct(rdng_ocr_status) from readingmaster where rdng_ocr_status='Passed'  and cons_ac_no='{cons_ac_no}' and mr_id='{mr_id}' and manual_update_flag isnull and  qc_done !='byLambda'
     """
+
     ocrstatus = ""
     cursor.execute(query)
     result = cursor.fetchall()
     if len(result) > 0:
         if result[0][0] == "Passed":
             ocrstatus = "Passed"
+
     else:
         ocrstatus = "THERE IS NO OCR PASSED FOR THIS CONSUMER"
 
