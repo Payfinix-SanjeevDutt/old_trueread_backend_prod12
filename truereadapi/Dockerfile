@@ -1,12 +1,16 @@
-# Start from the AWS Base Image for Python (correct tag)
 FROM public.ecr.aws/lambda/python:3.11
 
-# Install dependencies (ensure serverless-wsgi is in requirements.txt)
-COPY lamdareq.txt .
-RUN pip install --no-cache-dir -r lamdareq.txt
+# Copy and install dependencies
+COPY lamdareq.txt ${LAMBDA_TASK_ROOT}/
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/lamdareq.txt
 
-# Copy your entire Django project into the Lambda task root (/var/task)
-COPY . ${LAMBDA_TASK_ROOT}
+# Copy all application code
+COPY . ${LAMBDA_TASK_ROOT}/
 
-# CRITICAL: Use the handler file as the entry point for the Lambda Runtime Interface Client
+# Verify handler exists (for debugging)
+RUN ls -la ${LAMBDA_TASK_ROOT}/lambda_handler.py && \
+    echo "=== lambda_handler.py content ===" && \
+    cat ${LAMBDA_TASK_ROOT}/lambda_handler.py
+
+# Set the handler
 CMD ["lambda_handler.handler"]
