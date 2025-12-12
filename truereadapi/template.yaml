@@ -12,6 +12,7 @@ Resources:
   DjangoLambdaFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: django  # ← ADD THIS LINE to use your existing Lambda
       # Use PackageType: Image for container deployment
       PackageType: Image
       # Handler is defined in Dockerfile CMD, but keep it here for reference
