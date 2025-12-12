@@ -32,4 +32,4 @@ Resources:
 Outputs:
   DjangoApiUrl:
     Description: "API Gateway endpoint URL for your Django Lambda function"
-    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
