@@ -37,3 +37,6 @@ env/
 *.egg-info/
 dist/
 build/
+
+# aws sam
+.aws-sam/
