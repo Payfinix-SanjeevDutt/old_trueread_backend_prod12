@@ -8536,6 +8536,9 @@ def meterreaderDetails(request):
                 if key == "rdng_ocr_status":
                     conditions.append(
                         f"rdng_ocr_status='{data['rdng_ocr_status']}'")
+                    
+                if key == "Exception":
+                    conditions.append(f"rdng_ocr_status='{value}'")
 
                 if key == "con_trf_cat":
                     conditions.append(f"con_trf_cat='{value}'")
