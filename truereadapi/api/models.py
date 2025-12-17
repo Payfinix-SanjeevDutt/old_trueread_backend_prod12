@@ -313,3 +313,9 @@ class SupervsiorLocation(models.Model):
 
     class Meta:
         db_table = "supervsiorlocation"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['supervisor_number', 'date'],
+                name='unique_supervisor_date'
+            )
+        ]
