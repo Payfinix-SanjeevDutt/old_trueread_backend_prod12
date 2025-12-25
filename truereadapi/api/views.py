@@ -6449,9 +6449,10 @@ def application_uptime(request):
     # SLA period = full calendar month
     start_time = now.replace(day=1)
     last_day = monthrange(now.year, now.month)[1]
-    end_time = now.replace(day=last_day)
+    # end_time = now.replace(day=last_day)
+    end_time = now  # CURRENT DATE
 
-    uptime = get_lambda_uptime("your-lambda-function-name")
+    uptime = get_lambda_uptime("new-truereadapi-prod12")
 
     if uptime >= 95:
         penalty = "No Penalty"
