@@ -2311,6 +2311,8 @@ def okprevmonbutfailednow(request):
     except:
         return Response([])
 
+
+
 #indra-sbpdcl        
 @api_view(['POST'])
 def custom_sbpdcl_mrreports(request):
@@ -2442,59 +2444,144 @@ def custom_sbpdcl_mrreports(request):
         "data": results,
     })
 
-#sbpdcl
+
+
+# indra-sbpdcl
 @api_view(["POST"])
 def reading_details_by_mrid(request):
     mr_id = request.data.get("mr_id")
+    prsnt_mtr_status = request.data.get("prsnt_mtr_status") or request.data.get("prsnt_meter_status")
+    rdng_ocr_status = request.data.get("rdng_ocr_status") or request.data.get("ocr_status")
+    # Clean empty strings
+    prsnt_mtr_status = prsnt_mtr_status.strip() if isinstance(prsnt_mtr_status, str) else None
+    rdng_ocr_status = rdng_ocr_status.strip() if isinstance(rdng_ocr_status, str) else None
     start_date = request.data.get("start_date")
     end_date = request.data.get("end_date")
     pagesize = int(request.data.get("pagesize", 20))
     page = int(request.data.get("page", 1))
-    offset = (pagesize * page) - pagesize
+    offset = (page - 1) * pagesize
+    # Validation
     if not mr_id:
-        return Response({"status": False, "message": "mr_id is required"})
+        return Response({"status": False, "message": "mr_id is required"}, status=400)
     if not start_date or not end_date:
-        return Response({"status": False, "message": "start_date and end_date are required"})
- 
+        return Response({"status": False, "message": "start_date and end_date are required"}, status=400)
+    try:
+        sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+        ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        return Response({"status": False, "message": "Dates must be YYYY-MM-DD"}, status=400)
+    if sd > ed:
+        return Response({"status": False, "message": "start_date cannot be after end_date"}, status=400)
     cursor = connection.cursor()
-    count_query = """
-        SELECT COUNT(*) FROM readingmaster WHERE mr_id = %sAND reading_date_db BETWEEN %s AND %s and mr_id <> '' AND LENGTH(mr_id) > 5
-    """
-    cursor.execute(count_query, [mr_id, start_date, end_date])
+    # Build WHERE clauses
+    where_conditions = [
+        "mr_id = %s",
+        "reading_date_db::date BETWEEN %s AND %s"
+    ]
+    params = [mr_id, start_date, end_date]
+    if prsnt_mtr_status:
+        where_conditions.append("prsnt_mtr_status = %s")
+        params.append(prsnt_mtr_status)
+    if rdng_ocr_status:
+        where_conditions.append("rdng_ocr_status = %s")
+        params.append(rdng_ocr_status)
+    where_clause = " AND ".join(where_conditions)
+    # --- COUNT QUERY ---
+    count_query = f"SELECT COUNT(*) FROM readingmaster WHERE {where_clause}"
+    cursor.execute(count_query, params)
     total_count = cursor.fetchone()[0]
+    # If no data return here
     if total_count == 0:
-        return Response({
-            "status": True,
-            "message": "No data found for given MR ID and date range",
-            "data": []
-        })
+        # Print SQL for debugging
+        print("NO DATA SQL:", cursor.mogrify(count_query, params).decode())
+        return Response({"status": True, "message": "No data found", "data": []})
     total_pages = (total_count + pagesize - 1) // pagesize
- 
-    query = """
-        SELECT rdng_date AS date,mr_ph_no AS mobile_number,con_mtr_sl_no AS meter_slno,cons_ac_no AS consumer_id,geo_lat AS geo_lat,geo_long AS geo_long,rdng_img AS reading_image
+    query = f"""
+        SELECT rdng_date AS date,
+               mr_ph_no AS mobile_number,
+               con_mtr_sl_no AS meter_slno,
+               cons_ac_no AS consumer_id,
+               geo_lat AS geo_lat,
+               geo_long AS geo_long,
+               rdng_img AS reading_image,
+               prsnt_mtr_status AS meter_status,
+               rdng_ocr_status AS ocr_status
         FROM readingmaster
-        WHERE mr_id = %s AND reading_date_db BETWEEN %s AND %s AND mr_id <> '' AND LENGTH(mr_id) > 5 ORDER BY reading_date_db DESC LIMIT %s OFFSET %s
+        WHERE {where_clause}
+        ORDER BY reading_date_db DESC
+        LIMIT %s OFFSET %s
     """
-    params = [mr_id, start_date, end_date, pagesize, offset]
-    cursor.execute(query, params)
+    final_params = params + [pagesize, offset]
+    cursor.execute(query, final_params)
+    print("\nFINAL SQL:\n", cursor.mogrify(query, final_params).decode())
+
     columns = [col[0] for col in cursor.description]
     data = [dict(zip(columns, row)) for row in cursor.fetchall()]
-    final_sql = query
-    for p in params:
-        final_sql = final_sql.replace("%s", f"'{p}'", 1)
- 
-    print("QUERY:-->>>>", final_sql)
     return Response({
         "status": True,
-        "message": f"{len(data)} records fetched successfully",
+        "message": f"{len(data)} records fetched",
         "mr_id": mr_id,
         "total_records": total_count,
-        "total_pages":total_pages,
+        "total_pages": total_pages,
         "page": page,
         "pagesize": pagesize,
-        "data": data,
-        # "executed_query": final_sql,  # ⬅ returned in response also
+        "data": data
     })
+
+
+#sbpdcl
+# @api_view(["POST"])
+# def reading_details_by_mrid(request):
+#     mr_id = request.data.get("mr_id")
+#     start_date = request.data.get("start_date")
+#     end_date = request.data.get("end_date")
+#     pagesize = int(request.data.get("pagesize", 20))
+#     page = int(request.data.get("page", 1))
+#     offset = (pagesize * page) - pagesize
+#     if not mr_id:
+#         return Response({"status": False, "message": "mr_id is required"})
+#     if not start_date or not end_date:
+#         return Response({"status": False, "message": "start_date and end_date are required"})
+ 
+#     cursor = connection.cursor()
+#     count_query = """
+#         SELECT COUNT(*) FROM readingmaster WHERE mr_id = %sAND reading_date_db BETWEEN %s AND %s and mr_id <> '' AND LENGTH(mr_id) > 5
+#     """
+#     cursor.execute(count_query, [mr_id, start_date, end_date])
+#     total_count = cursor.fetchone()[0]
+#     if total_count == 0:
+#         return Response({
+#             "status": True,
+#             "message": "No data found for given MR ID and date range",
+#             "data": []
+#         })
+#     total_pages = (total_count + pagesize - 1) // pagesize
+ 
+#     query = """
+#         SELECT rdng_date AS date,mr_ph_no AS mobile_number,con_mtr_sl_no AS meter_slno,cons_ac_no AS consumer_id,geo_lat AS geo_lat,geo_long AS geo_long,rdng_img AS reading_image
+#         FROM readingmaster
+#         WHERE mr_id = %s AND reading_date_db BETWEEN %s AND %s AND mr_id <> '' AND LENGTH(mr_id) > 5 ORDER BY reading_date_db DESC LIMIT %s OFFSET %s
+#     """
+#     params = [mr_id, start_date, end_date, pagesize, offset]
+#     cursor.execute(query, params)
+#     columns = [col[0] for col in cursor.description]
+#     data = [dict(zip(columns, row)) for row in cursor.fetchall()]
+#     final_sql = query
+#     for p in params:
+#         final_sql = final_sql.replace("%s", f"'{p}'", 1)
+ 
+#     print("QUERY:-->>>>", final_sql)
+#     return Response({
+#         "status": True,
+#         "message": f"{len(data)} records fetched successfully",
+#         "mr_id": mr_id,
+#         "total_records": total_count,
+#         "total_pages":total_pages,
+#         "page": page,
+#         "pagesize": pagesize,
+#         "data": data,
+#         # "executed_query": final_sql,  # ⬅ returned in response also
+#     })
  
 
 #Sanjeev
