@@ -1,8 +1,12 @@
+from datetime import date
+from django.db.models import Q, Exists, OuterRef
+from calendar import monthrange
 from django.db import DatabaseError, IntegrityError
 from api.models import SupervsiorLocation
 import uuid
 from api.models import SupervisorLogin
 from rest_framework.decorators import api_view
+from .services.uptime_service import get_lambda_uptime, get_rds_uptime
 from datetime import date, timedelta
 from django.shortcuts import render
 from rest_framework.response import Response
@@ -805,13 +809,10 @@ def metereReaderlogin(request):
         )
 
 
-from django.db.models import Q, Exists, OuterRef
-from datetime import date
-
 @api_view(["GET"])
 def getregdata(request):
     role_to_fetch = request.query_params.get('role', 'meterreader').lower()
-    
+
     if role_to_fetch == 'supervisor':
         today = date.today()
         location_exists = SupervsiorLocation.objects.filter(
@@ -828,7 +829,8 @@ def getregdata(request):
                 .values_list('id', flat=True)
             )
             .annotate(location=Exists(location_exists))
-            .order_by('supervisor_number', '-location')   # must match DISTINCT ON rule
+            # must match DISTINCT ON rule
+            .order_by('supervisor_number', '-location')
             .distinct('supervisor_number')
         )
 
@@ -6298,9 +6300,9 @@ def supervisorlogin(request):
         }
     })
 
-#deeepak
-from api.models import SupervsiorLocation
-from django.db import connection
+
+# deeepak
+
 
 @api_view(["POST"])
 def supervisorlocation(request):
@@ -6329,15 +6331,17 @@ def supervisorlocation(request):
                     geo_long = EXCLUDED.geo_long
                 RETURNING (xmax = 0) AS inserted
             """, [supervisor_number, geo_lat, geo_long, date])
-            
+
             result = cursor.fetchone()
             created = result[0] if result else False
-        
+
         message = "location added" if created else "location updated"
         return Response({"status": True, "message": message})
-        
+
     except Exception as e:
         return Response({"status": False, "message": f"Database error: {str(e)}"}, status=500)
+
+
 @api_view(["POST"])
 def newmvcheck(request):
     pagesize = request.data.get("pagesize", None)
@@ -6436,6 +6440,63 @@ def newmvcheck(request):
         total_count = dictfetchall(cursor)[0]["count"]
 
         return Response({"count": total_count, "results": results})
+
+
+@api_view(["GET"])
+def application_uptime(request):
+    now = datetime.utcnow()
+
+    # SLA period = full calendar month
+    start_time = now.replace(day=1)
+    last_day = monthrange(now.year, now.month)[1]
+    end_time = now.replace(day=last_day)
+
+    uptime = get_lambda_uptime("your-lambda-function-name")
+
+    if uptime >= 95:
+        penalty = "No Penalty"
+    elif uptime >= 90:
+        penalty = "5% Penalty"
+    elif uptime >= 80:
+        penalty = "10% Penalty"
+    else:
+        penalty = "15% Penalty"
+
+    return Response({
+        "uptime_percentage": uptime,
+        "penalty": penalty,
+        "start_time": start_time.strftime("%d %b %Y"),
+        "end_time": end_time.strftime("%d %b %Y")
+    })
+
+# @api_view(["GET"])
+# def application_uptime(request):
+#     end_time = datetime.utcnow()
+#     start_time = end_time - timedelta(days=30)
+
+#     lambda_uptime = get_lambda_uptime("new-truereadapi-prod12")
+#     rds_uptime = get_rds_uptime("database-2")
+
+#     application_uptime = min(lambda_uptime, rds_uptime)
+
+#     if application_uptime >= 95:
+#         penalty = "No Penalty"
+#     elif application_uptime >= 90:
+#         penalty = "5% Penalty"
+#     elif application_uptime >= 80:
+#         penalty = "10% Penalty"
+#     else:
+#         penalty = "15% Penalty"
+
+#     return Response({
+#         "application_uptime": application_uptime,
+#         "lambda_uptime": lambda_uptime,
+#         "rds_uptime": rds_uptime,
+#         "penalty": penalty,
+#         "start_time": start_time.strftime("%d %b %Y"),
+#         "end_time": end_time.strftime("%d %b %Y")
+#     })
+
 
 
 @api_view(["POST"])
@@ -6694,8 +6755,8 @@ def clusterstestnew(request):
     clause = ""
     # try:
     if data:
-        #this below code is for supervisor location
-        if "mr_id" in data :
+        # this below code is for supervisor location
+        if "mr_id" in data:
             mr_id_value = data["mr_id"]
             if mr_id_value.startswith('SUP_'):
                 supervisor_number = mr_id_value[4:]
@@ -6711,21 +6772,20 @@ def clusterstestnew(request):
                         supervisor_login_data = SupervisorLogin.objects.filter(
                             supervisor_number=supervisor_number
                         ).values('supervisor_name', 'ofc_division', 'ofc_subdivision').first()
-                    
+
                     print("location type", type(locations))
                     location_list = list(locations)
-                    
+
                     # Add supervisor_login_data to each location in the list
                     if supervisor_login_data:
                         for location in location_list:
                             location.update(supervisor_login_data)
-                    
+
                     return Response(location_list)
-                    
+
                 except Exception as e:
                     print(f"Database query error: {e}")
 
-        
         clause += "WHERE "
         for i, (key, value) in enumerate(data.items()):
             if i > 0:
@@ -8640,17 +8700,17 @@ ORDER BY EXTRACT(month FROM reading_date_db)"""
 #         print(e)  # Log the error for debugging purposes
 #         return Response({"result": [], "count": 5})
 
-#indra
+# indra
 @api_view(["POST"])
 def meterreaderDetails(request):
     pagesize = request.data.get("pagesize")
     page = request.data.get("page")
     offset = (int(pagesize) * int(page)) - int(pagesize)
- 
+
     import time
- 
+
     start = time.time()
- 
+
     data = request.data.get("filters", None)
     clause = ""
     try:
@@ -8663,27 +8723,27 @@ def meterreaderDetails(request):
                     month = value.split("-")[1]
                     conditions.append(
                         f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'")
- 
+
                 if key == "startdate":
                     conditions.append(
                         f"extract(day from reading_date_db) BETWEEN '{data['startdate']}'")
- 
+
                 if key == "enddate":
                     conditions.append(f"'{data['enddate']}'")
- 
+
                 if key == "mr_id":
                     conditions.append(f"mr_id='{data['mr_id']}'")
- 
+
                 if key == "searchdata":
                     conditions.append(
                         f"(mr_id='{data['searchdata']}' OR cons_ac_no='{data['searchdata']}' OR cons_name='{data['searchdata']}')")
- 
+
                 if key == "rdng_ocr_status":
                     conditions.append(
                         f"rdng_ocr_status='{data['rdng_ocr_status']}'")
                 if key == "Exception":
                     conditions.append(f"rdng_ocr_status='{value}'")
- 
+
                 if key == "prsnt_rdng_ocr_excep":
                     # CASE 1: Passed → get only passed rows
                     if value == "Passed":
@@ -8691,44 +8751,45 @@ def meterreaderDetails(request):
                     # CASE 2: Failed (All)
                     elif value == "__FAILED__":
                         # Get rows where there IS an exception (not empty, not null)
-                        conditions.append("TRIM(COALESCE(prsnt_rdng_ocr_excep, '')) <> ''")
+                        conditions.append(
+                            "TRIM(COALESCE(prsnt_rdng_ocr_excep, '')) <> ''")
                     # CASE 3: Failed + Specific Reason
                     else:
                         conditions.append(f"prsnt_rdng_ocr_excep = '{value}'")
- 
+
                 if key == "con_trf_cat":
                     conditions.append(f"con_trf_cat='{value}'")
-                
+
                 if key == 'prsnt_mtr_status':
                     conditions.append(f"prsnt_mtr_status='{value}'")
- 
+
                 if key == "bl_agnc_name":
                     conditions.append(f"bl_agnc_name='{data['bl_agnc_name']}'")
- 
+
                 if key == "Discom":
                     conditions.append(f"ofc_discom='{data['Discom']}'")
                 # if key == "ofc_discom":
                 #     conditions.append(f"ofc_discom='{data['ofc_discom']}'")
- 
+
                 if key == "zone":
                     conditions.append(f"ofc_zone='{data['zone']}'")
- 
+
                 if key == "circle":
                     conditions.append(f"ofc_circle='{data['circle']}'")
- 
+
                 if key == "Division":
                     conditions.append(f"ofc_division='{data['Division']}'")
- 
+
                 if key == "Subdivision":
                     conditions.append(
                         f"ofc_subdivision='{data['Subdivision']}'")
- 
+
                 if key == "Section":
                     conditions.append(f"ofc_section='{data['Section']}'")
- 
+
             # Join all conditions using 'AND'
             clause += " AND ".join(conditions)
- 
+
             selected_month = data.get("month", None)
             today = datetime.now()
             this_month = today.strftime("%Y-%m")
@@ -8736,7 +8797,7 @@ def meterreaderDetails(request):
                 today - timedelta(days=today.day)).strftime("%Y-%m")
             tablename = "prevmonthsdata" if selected_month not in {
                 this_month, previous_month} else "readingmaster"
- 
+
             cursor = connection.cursor()
             query = f"""
                 SELECT mr_id, cons_ac_no, bl_agnc_name, abnormality, cons_name, con_trf_cat, con_mtr_sl_no,
@@ -8751,25 +8812,25 @@ def meterreaderDetails(request):
             print("QUERY!", query)
             cursor.execute(query)
             person_objects = dictfetchall(cursor)
- 
+
             query2 = f"""
                 SELECT COUNT(*) AS total_count FROM {tablename} {clause}
                 """
             print("QUERY!", query2)
- 
+
             cursor.execute(query2)
             rows = cursor.fetchone()
- 
+
             print(time.time() - start)
             return Response({"result": person_objects, "count": rows[0]})
         else:
             # No filters present, return empty response
             return Response({"result": [], "count": 0})
- 
+
     except Exception as e:
         print(e)  # Log the error for debugging purposes
         return Response({"result": [], "count": 5})
- 
+
 
 @api_view(["POST"])
 def cons_wise_details_with_search(request):
