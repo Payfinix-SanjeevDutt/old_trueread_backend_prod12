@@ -69,19 +69,7 @@ from django_filters import FilterSet
 # Create your views here.
 
 SECRETKEY = "6AZJYQ2T317WGPXC0UHVLDOR49FIBS8N5ME"
-import time
-from functools import wraps
 
-def timeit(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()  # Start timer
-        result = func(*args, **kwargs)    # Run function
-        end_time = time.perf_counter()    # End timer
-        execution_time = end_time - start_time
-        print(f"Function '{func.__name__}' took {execution_time:.4f} seconds")
-        return result
-    return wrapper
 
 # ------------------------------v6.2.19--------------------------------------
 # @parser_classes([MultiPartParser, FormParser])
@@ -6352,278 +6340,107 @@ def supervisorlocation(request):
 
     except Exception as e:
         return Response({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-# @api_view(["POST"])
-# def newmvcheck(request):
-#     pagesize = request.data.get("pagesize", None)
-#     page = request.data.get("page", 1)
-#     orderby = request.data.get("orderby", "DESC")
-#     filters = request.data.get("filters", {})
-#     # print("filters...", filters)
-#     export_all = request.data.get("export_all", False)  # NEW FLAG
 
-#     offset = (int(pagesize) * int(page)) - int(pagesize) if pagesize else 0
 
-#     # Build filter clause
-#     clause_parts = []
-#     for key, value in filters.items():
-#         # if key == "month":
-#         #     year, month = value.split("-")
-#         #     clause_parts.append(
-#         #         f"EXTRACT(month from m.reading_date_db) = '{month}'")
-#         #     clause_parts.append(
-#         #         f"EXTRACT(year from m.reading_date_db) = '{year}'")
-#         # elif key == "startdate":
-#         #     clause_parts.append(
-#         #         f"EXTRACT(day from m.reading_date_db) >= '{value}'")
-#         # elif key == "enddate":
-#         #     clause_parts.append(
-#         #         f"EXTRACT(day from m.reading_date_db) <= '{value}'")
-#         if key == "month":
-#             year, month = value.split("-")
-#             import calendar
-#             last_day = calendar.monthrange(int(year), int(month))[1]
-#             start_dt = f"{year}-{month}-01"
-#             end_dt = f"{year}-{month}-{last_day}"
-            
-#             clause_parts.append(f"m.reading_date_db >= '{start_dt}'")
-#             clause_parts.append(f"m.reading_date_db <= '{end_dt}'")
-
-#         # 
-#         # ... inside your loop ...
-
-#         elif key == "startdate":
-#             # Check if we have a month filter to combine with
-#             if "month" in filters:
-#                 year, month_part = filters["month"].split("-")
-#                 # Create a full date: '2025-12' + '01' -> '2025-12-01'
-#                 full_date = f"{year}-{month_part}-{int(value):02d}"
-#                 clause_parts.append(f"m.reading_date_db >= '{full_date}'")
-#             else:
-#                 # Fallback: If no month is selected, we must use the old slow way
-#                 # because we don't know which year/month '1' belongs to.
-#                 clause_parts.append(f"EXTRACT(day from m.reading_date_db) >= '{value}'")
-
-#         elif key == "enddate":
-#             if "month" in filters:
-#                 year, month_part = filters["month"].split("-")
-#                 full_date = f"{year}-{month_part}-{int(value):02d}"
-#                 clause_parts.append(f"m.reading_date_db <= '{full_date}'")
-#             else:
-#                 clause_parts.append(f"EXTRACT(day from m.reading_date_db) <= '{value}'")
-            
-#         #     
-#         elif key == "mr_id":
-#             clause_parts.append(f"m.mr_id = '{value}'")
-#         elif key == "prsnt_mtr_status":
-#             clause_parts.append(f"m.prsnt_mtr_status = '{value}'")
-#         elif key == "reading_parameter_type":
-#             clause_parts.append(f"m.reading_parameter_type = '{value}'")
-#             clause_parts.append("m.rdng_ocr_status = 'Failed'")
-#         elif key == "searchdata":
-#             clause_parts.append(
-#                 f"(m.mr_id = '{value}' OR m.cons_ac_no = '{value}' OR m.cons_name = '{value}')"
-#             )
-#         elif key == "rdng_ocr_status":
-#             if value == "OCR without Exception":
-#                 clause_parts.append("m.rdng_ocr_status = 'Passed'")
-#             elif value == "OCR with Exception":
-#                 exception_detail = filters.get("prsnt_rdng_ocr_excep")
-#                 clause_parts.append("m.rdng_ocr_status = 'Failed'")
-#                 if exception_detail:
-#                     clause_parts.append(
-#                         f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
-#         elif key == "bl_agnc_name":
-#             clause_parts.append(f"bl_agnc_name = '{value}'")
-#         # elif key == "ofc_discom":
-#         #     clause_parts.append(f"ofc_discom = '{value}'")
-#         elif key == "ofc_discom":
-#             if value and value.upper() != "ALL":
-#                 clause_parts.append(f"ofc_discom = '{value}'")
-
-#     clause = " AND ".join(clause_parts)
-#     clause = f" AND {clause}" if clause else ""
-
-#     tablename = "readingmaster"  # Adjust if needed
-
-#     # Base SELECT
-#     query = f"""
-#         SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng,
-#                m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading,
-#                m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status,
-#                m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto",
-#                m.prsnt_rdng_ocr_excep, m.reading_parameter_type
-#         FROM {tablename} m
-#         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-#         WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
-#                OR m.rdng_ocr_status_changed_by ILIKE '%vapp%' OR m.qc_done != 'byLambda')
-#         AND m.rdng_img != '' {clause}
-#         ORDER BY m.rdng_date {orderby}
-#     """
-
-#     # Only apply LIMIT/OFFSET when NOT exporting all
-#     if not export_all and pagesize:
-#         query += f" LIMIT {pagesize} OFFSET {offset}"
-
-#     print("------>",query)
-#     cursor = connection.cursor()
-#     cursor.execute(query)
-#     results = dictfetchall(cursor)
-
-#     if export_all:
-#         # No need to run count, just return all rows
-#         return Response({"count": len(results), "results": results})
-#     else:
-#         # Normal pagination → get total count
-#         query_total = f"""
-#             SELECT COUNT(*) FROM {tablename} m
-#             LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-#             WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
-#                    OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
-#             AND m.rdng_img != '' {clause}
-#         """
-#         cursor.execute(query_total)
-#         total_count = dictfetchall(cursor)[0]["count"]
-
-#         return Response({"count": total_count, "results": results})
-
-# @timeit
 @api_view(["POST"])
 def newmvcheck(request):
     pagesize = request.data.get("pagesize", None)
     page = request.data.get("page", 1)
     orderby = request.data.get("orderby", "DESC")
     filters = request.data.get("filters", {})
-    export_all = request.data.get("export_all", False)
+    print("filters...", filters)
+    export_all = request.data.get("export_all", False)  # NEW FLAG
 
     offset = (int(pagesize) * int(page)) - int(pagesize) if pagesize else 0
 
+    # Build filter clause
     clause_parts = []
-    params = []
-
-    # 2. Build the WHERE clause safely
     for key, value in filters.items():
         if key == "month":
             year, month = value.split("-")
-            import calendar
-            last_day = calendar.monthrange(int(year), int(month))[1]
-            start_dt = f"{year}-{month}-01 00:00:00"
-            end_dt = f"{year}-{month}-{last_day} 23:59:59"
-            
-            clause_parts.append("m.reading_date_db >= %s")
-            params.append(start_dt)
-            clause_parts.append("m.reading_date_db <= %s")
-            params.append(end_dt)
-
+            clause_parts.append(
+                f"EXTRACT(month from m.reading_date_db) = '{month}'")
+            clause_parts.append(
+                f"EXTRACT(year from m.reading_date_db) = '{year}'")
         elif key == "startdate":
-            # Optimized logic with fallback
-            if "month" in filters:
-                year, month_part = filters["month"].split("-")
-                full_date = f"{year}-{month_part}-{int(value):02d}"
-                clause_parts.append("m.reading_date_db >= %s")
-                params.append(full_date)
-            else:
-                # Still risky logic, but safe execution
-                clause_parts.append("EXTRACT(day from m.reading_date_db) >= %s")
-                params.append(value)
-
+            clause_parts.append(
+                f"EXTRACT(day from m.reading_date_db) >= '{value}'")
         elif key == "enddate":
-            if "month" in filters:
-                year, month_part = filters["month"].split("-")
-                full_date = f"{year}-{month_part}-{int(value):02d} 23:59:59"
-                clause_parts.append("m.reading_date_db <= %s")
-                params.append(full_date)
-            else:
-                clause_parts.append("EXTRACT(day from m.reading_date_db) <= %s")
-                params.append(value)
-
+            clause_parts.append(
+                f"EXTRACT(day from m.reading_date_db) <= '{value}'")
         elif key == "mr_id":
-            clause_parts.append("m.mr_id = %s")
-            params.append(value)
-            
+            clause_parts.append(f"m.mr_id = '{value}'")
         elif key == "prsnt_mtr_status":
-            clause_parts.append("m.prsnt_mtr_status = %s")
-            params.append(value)
-
+            clause_parts.append(f"m.prsnt_mtr_status = '{value}'")
         elif key == "reading_parameter_type":
-            clause_parts.append("m.reading_parameter_type = %s")
-            params.append(value)
-            clause_parts.append("m.rdng_ocr_status = 'Failed'") # Hardcoded string is fine
-
+            clause_parts.append(f"m.reading_parameter_type = '{value}'")
+            clause_parts.append("m.rdng_ocr_status = 'Failed'")
         elif key == "searchdata":
-            # Note: We repeat 'value' in params 3 times for the 3 placeholders
-            clause_parts.append("(m.mr_id = %s OR m.cons_ac_no = %s OR m.cons_name = %s)")
-            params.extend([value, value, value]) 
-
+            clause_parts.append(
+                f"(m.mr_id = '{value}' OR m.cons_ac_no = '{value}' OR m.cons_name = '{value}')"
+            )
         elif key == "rdng_ocr_status":
             if value == "OCR without Exception":
                 clause_parts.append("m.rdng_ocr_status = 'Passed'")
             elif value == "OCR with Exception":
-                clause_parts.append("m.rdng_ocr_status = 'Failed'")
                 exception_detail = filters.get("prsnt_rdng_ocr_excep")
+                clause_parts.append("m.rdng_ocr_status = 'Failed'")
                 if exception_detail:
-                    clause_parts.append("m.prsnt_rdng_ocr_excep = %s")
-                    params.append(exception_detail)
-
+                    clause_parts.append(
+                        f"m.prsnt_rdng_ocr_excep = '{exception_detail}'")
         elif key == "bl_agnc_name":
-            clause_parts.append("bl_agnc_name = %s")
-            params.append(value)
-
+            clause_parts.append(f"bl_agnc_name = '{value}'")
+        # elif key == "ofc_discom":
+        #     clause_parts.append(f"ofc_discom = '{value}'")
         elif key == "ofc_discom":
             if value and value.upper() != "ALL":
-                clause_parts.append("ofc_discom = %s")
-                params.append(value)
+                clause_parts.append(f"ofc_discom = '{value}'")
 
-    # Combine clauses
     clause = " AND ".join(clause_parts)
     clause = f" AND {clause}" if clause else ""
-    
-    tablename = "readingmaster"
 
-    # 3. Main Query
+    tablename = "readingmaster"  # Adjust if needed
+
+    # Base SELECT
     query = f"""
         SELECT m.con_mtr_sl_no, m.mr_id as "mrId", m.rdng_date, m.prsnt_mtr_status, m.prsnt_ocr_rdng,
                m.prsnt_rdng, m.ocr_pf_status, pf_image, pf_manual_reading,
                m.cons_name, m.cons_ac_no, m.prsnt_md_rdng_ocr, m.rdng_ocr_status,
-               m.rdng_img,m.prsnt_md_rdng, m.id, r."mrPhoto",
+               m.rdng_img, m.prsnt_md_rdng, m.id, r."mrPhoto",
                m.prsnt_rdng_ocr_excep, m.reading_parameter_type
         FROM {tablename} m
         LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-        WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by='' 
-               OR m.rdng_ocr_status_changed_by ILIKE 'vapp%%' OR m.qc_done != 'byLambda')
+        WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
+               OR m.rdng_ocr_status_changed_by ILIKE '%vapp%' OR m.qc_done != 'byLambda')
         AND m.rdng_img != '' {clause}
         ORDER BY m.rdng_date {orderby}
     """
-    # Note: %%vapp%% escapes the % for python strings, but params handle the rest.
 
+    # Only apply LIMIT/OFFSET when NOT exporting all
     if not export_all and pagesize:
         query += f" LIMIT {pagesize} OFFSET {offset}"
 
     cursor = connection.cursor()
-
-    # print("------ EXECUTING QUERY ------")
-    # print(cursor.mogrify(query, params).decode('utf-8'))
-    # print("-----------------------------")
-    
-    cursor.execute(query, params) 
+    cursor.execute(query)
     results = dictfetchall(cursor)
 
     if export_all:
+        # No need to run count, just return all rows
         return Response({"count": len(results), "results": results})
     else:
+        # Normal pagination → get total count
         query_total = f"""
             SELECT COUNT(*) FROM {tablename} m
             LEFT JOIN meterreaderregistration r on m.mr_id=r."mrId"
-            WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by='' 
-                   OR m.rdng_ocr_status_changed_by ILIKE 'vapp%%')
+            WHERE (m.rdng_ocr_status_changed_by IS NULL OR m.rdng_ocr_status_changed_by=''
+                   OR m.rdng_ocr_status_changed_by ILIKE '%vapp%')
             AND m.rdng_img != '' {clause}
         """
-        # print(cursor.mogrify(query_total, params).decode('utf-8'))
-        cursor.execute(query_total, params)
+        cursor.execute(query_total)
         total_count = dictfetchall(cursor)[0]["count"]
 
         return Response({"count": total_count, "results": results})
 
-<<<<<<< HEAD
 
 @api_view(["GET"])
 def application_uptime(request):
@@ -6682,8 +6499,6 @@ def application_uptime(request):
 
 
 
-=======
->>>>>>> e32142c8ae778d2f01ca4bef033992bba48601e3
 @api_view(["POST"])
 def gitnewmvcheck(request):
     pagesize = request.data.get("pagesize", None)
