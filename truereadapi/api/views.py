@@ -459,18 +459,6 @@ def consumers_bulk(request):
         data["reading_date_db"] = reading_date_db
         data["bill_month_dt"] = bill_month_add
 
-        # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
-        # try:
-        #     if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
-        #         lambda_url = "https://meternometer.true-read.com"
-        #         payload = {"url": data.get("rdng_img")}
-        #         resp = requests.post(lambda_url, json=payload, timeout=30)
-        #         if resp.status_code == 200:
-        #             lambda_result = resp.json().get("result")
-        #             if lambda_result == "No":  # meter not present
-        #                 data["prsnt_rdng_ocr_excep"] = "Invalid"
-        # except Exception as e:
-        #     print("Lambda call failed:", str(e))
 
         char = 0
         ba_bl_id = data["ba_bl_id"]
@@ -487,22 +475,6 @@ def consumers_bulk(request):
 
         # strip extra quotes or spaces
         rdngImg = rdngImg.strip('"').strip()
-
-        # try:
-        #     if data.get("rdng_ocr_status") in ["Failed"]:
-        #         lambda_url = "https://biharqc.true-read.com"
-        #         # lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
-        #         payload = {"image_url": rdngImg}
-        #         response = requests.post(lambda_url, json=payload, timeout=60)
-        #         if response.status_code == 200:
-        #             lambda_result = response.json().get("result")
-        #             # if lambda_result == "Passed":  # meter not present
-        #             data["rdng_ocr_status"] = lambda_result
-        #             if lambda_result == 'Passed':
-        #                 data["qc_done"] = 'byLambda'
-
-        # except Exception as e:
-        #     print("Lambda call failed:", str(e))
 
         try:
             if data["prsnt_mtr_status"] == "Ok":
@@ -568,7 +540,41 @@ def consumers_bulk(request):
                 data["rdng_ocr_status_changed_by"] = "Backend_RERUN"
         except:
             pass
- 
+        
+                # ---------------- METER COMPATIBILITY LOGIC ----------------
+# new logic fro exception addition in the new column
+
+        # prsnt_ocr_status = data.get("prsnt_ocr_status")
+        # ocr_md_status = data.get("ocr_md_status")
+        # kvah_status = data.get("kvah_Status")
+        # ocr_pf_status = data.get("ocr_pf_status")
+
+        # meter_status_result = "Incompatible meter"  # default
+
+        # # -------- PASSED --------
+        # if (
+        #     prsnt_ocr_status == "Passed" and
+        #     ocr_md_status == "Passed" and
+        #     (
+        #         (kvah_status is None and ocr_pf_status is None) or
+        #         (kvah_status == "Passed" and ocr_pf_status == "Passed")
+        #     )
+        # ):
+        #     meter_status_result = "Passed"
+
+        # # -------- WITH EXCEPTION --------
+        # elif (
+        #     prsnt_ocr_status == "Failed" and
+        #     ocr_md_status == "Failed" and
+        #     (
+        #         (kvah_status is None or ocr_pf_status is None) or
+        #         (kvah_status == "Failed" and ocr_pf_status == "Failed")
+        #     )
+        # ):
+        #     meter_status_result = "with exception"
+
+        # data["meter_status_result"] = meter_status_result
+
         # if bill id is present check the consumer ac no and month
  
         try:
