@@ -33,6 +33,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db import connection
 import json
 import jwt
+import requests
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -440,7 +441,7 @@ def consumers_bulk(request):
         adddate = "-01"
         bill_month_add = reading_date_db[:7] + adddate
         print(bill_month_add)
-
+ 
         reading_year = reading_date_db[:4]
         reading_month = reading_date_db[5:7]
         print(reading_date_db)
@@ -450,18 +451,6 @@ def consumers_bulk(request):
         data["reading_date_db"] = reading_date_db
         data["bill_month_dt"] = bill_month_add
 
-        # --- NEW LOGIC: validate "Image blur" or "Spoofed Image" using Lambda ---
-        # try:
-        #     if data.get("prsnt_rdng_ocr_excep") in ["Image blur", "Spoofed Image", "Meter Dirty"]:
-        #         lambda_url = "https://meternometer.true-read.com"
-        #         payload = {"url": data.get("rdng_img")}
-        #         resp = requests.post(lambda_url, json=payload, timeout=30)
-        #         if resp.status_code == 200:
-        #             lambda_result = resp.json().get("result")
-        #             if lambda_result == "No":  # meter not present
-        #                 data["prsnt_rdng_ocr_excep"] = "Invalid"
-        # except Exception as e:
-        #     print("Lambda call failed:", str(e))
 
         char = 0
         ba_bl_id = data["ba_bl_id"]
@@ -479,22 +468,6 @@ def consumers_bulk(request):
         # strip extra quotes or spaces
         rdngImg = rdngImg.strip('"').strip()
 
-        # try:
-        #     if data.get("rdng_ocr_status") in ["Failed"]:
-        #         lambda_url = "https://biharqc.true-read.com"
-        #         # lambda_url = "https://d3suh2sp5gptzlj5ea74vu4m2e0gbrap.lambda-url.us-east-2.on.aws/"
-        #         payload = {"image_url": rdngImg}
-        #         response = requests.post(lambda_url, json=payload, timeout=60)
-        #         if response.status_code == 200:
-        #             lambda_result = response.json().get("result")
-        #             # if lambda_result == "Passed":  # meter not present
-        #             data["rdng_ocr_status"] = lambda_result
-        #             if lambda_result == 'Passed':
-        #                 data["qc_done"] = 'byLambda'
-
-        # except Exception as e:
-        #     print("Lambda call failed:", str(e))
-
         try:
             if data["prsnt_mtr_status"] == "Ok":
                 if data["prsnt_ocr_rdng"] != "Not Found":
@@ -510,7 +483,7 @@ def consumers_bulk(request):
                     flag = False
                     if (prsnt_ocr_rdng_temp) == (prsnt_rdng_temp):
                         status = "Exact"
-
+ 
                     elif (len(prsnt_ocr_rdng_temp) - len(prsnt_rdng_temp)) in (-1, 1):
                         for x in range(len(str(temp))):
                             temp_t = str(temp)
@@ -527,19 +500,19 @@ def consumers_bulk(request):
                             u, v = prsnt_ocr_rdng_temp, prsnt_rdng_temp
                             if u[x] != v[x]:
                                 char += 1
-
+ 
                         if char == 1:
                             status = "1_val_diff"
                         else:
                             status = "diff"
-
+ 
                     else:
                         print("OOKOOKOKOKOKOK")
                         if (str(temp1) in str(temp)) and (len(str(temp1)) > 1):
                             status = "subs"
                         else:
                             status = "diff"
-
+ 
                     if status == "1_val_diff" or status == "1_val_miss" or status == "subs":
                         print("INSIDE UPDATESSSSS")
                         data["prsnt_rdng_ocr_odv"] = data["prsnt_ocr_rdng"]
@@ -553,15 +526,49 @@ def consumers_bulk(request):
         except:
             pass
         try:
-            if data["prsnt_mtr_status"] == "Ok" and data["rdng_ocr_status"] == "":
+            if data["prsnt_mtr_status"] == "Ok" and data["rdng_ocr_status"] == "" :
                 data["rdng_ocr_status"] = "Failed"
                 data["manual_update_flag"] = "true"
                 data["rdng_ocr_status_changed_by"] = "Backend_RERUN"
         except:
             pass
+        
+                # ---------------- METER COMPATIBILITY LOGIC ----------------
+# new logic fro exception addition in the new column
+
+        # prsnt_ocr_status = data.get("prsnt_ocr_status")
+        # ocr_md_status = data.get("ocr_md_status")
+        # kvah_status = data.get("kvah_Status")
+        # ocr_pf_status = data.get("ocr_pf_status")
+
+        # meter_status_result = "Incompatible meter"  # default
+
+        # # -------- PASSED --------
+        # if (
+        #     prsnt_ocr_status == "Passed" and
+        #     ocr_md_status == "Passed" and
+        #     (
+        #         (kvah_status is None and ocr_pf_status is None) or
+        #         (kvah_status == "Passed" and ocr_pf_status == "Passed")
+        #     )
+        # ):
+        #     meter_status_result = "Passed"
+
+        # # -------- WITH EXCEPTION --------
+        # elif (
+        #     prsnt_ocr_status == "Failed" and
+        #     ocr_md_status == "Failed" and
+        #     (
+        #         (kvah_status is None or ocr_pf_status is None) or
+        #         (kvah_status == "Failed" and ocr_pf_status == "Failed")
+        #     )
+        # ):
+        #     meter_status_result = "with exception"
+
+        # data["meter_status_result"] = meter_status_result
 
         # if bill id is present check the consumer ac no and month
-
+ 
         try:
             newid = (
                 Consumers.objects.filter(
@@ -571,7 +578,6 @@ def consumers_bulk(request):
                 .order_by("-id")
                 .first()
             )
-
             print("newid", newid)
             if newid is not None:
                 # Check all the columns only then update
@@ -672,7 +678,7 @@ def consumers_bulk(request):
                         count_update += 1
 
             # if bill id is not present then insert
-
+ 
             else:
                 print("inserted")
                 serializer = ConsumerSerializer(data=data)
@@ -683,7 +689,6 @@ def consumers_bulk(request):
         except Exception as e:
             failedCons = {"message": str(e), "cons_ac_no": data['cons_ac_no']}
             failed_consumers.append(failedCons)
-
     print({"status": True, "message": f"Data inserted {count_insert} and Data updated {count_update}", "version": "28"})
     if len(failed_consumers) > 0:
         return Response(
@@ -6469,6 +6474,60 @@ def application_uptime(request):
         "start_time": start_time.strftime("%d %b %Y"),
         "end_time": end_time.strftime("%d %b %Y")
     })
+    
+    
+#for dily uptime for date range
+from datetime import datetime, timedelta
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .services.uptime_service import (
+    get_lambda_uptime_for_day,
+    calculate_penalty,
+)
+# Example helper (replace with real logic)
+
+@api_view(["GET"])
+def application_uptime_daily(request):
+    start_date_str = request.GET.get("start_date")
+    end_date_str = request.GET.get("end_date")
+
+    if not start_date_str or not end_date_str:
+        return Response(
+            {"error": "start_date and end_date are required (YYYY-MM-DD)"},
+            status=400,
+        )
+
+    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+    end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
+    if start_date > end_date:
+        return Response(
+            {"error": "start_date cannot be after end_date"},
+            status=400,
+        )
+
+    results = []
+    current_date = start_date
+
+    while current_date <= end_date:
+        uptime = get_lambda_uptime_for_day(
+            "new-truereadapi-prod12",
+            current_date,
+        )
+
+        results.append({
+            "date": current_date.strftime("%d %b %Y"),
+            "uptime_percentage": uptime,
+            "penalty": calculate_penalty(uptime),
+        })
+
+        current_date += timedelta(days=1)
+
+    return Response({
+        "start_date": start_date.strftime("%d %b %Y"),
+        "end_date": end_date.strftime("%d %b %Y"),
+        "daily_uptime": results,
+    })
 
 # @api_view(["GET"])
 # def application_uptime(request):
@@ -8880,6 +8939,7 @@ def cons_wise_details_with_search(request):
     print("QUERY------>", query)
     cursor.execute(query)
     results = dictfetchall(cursor)
+    print(results)
     return Response(results)
 
 
@@ -12973,3 +13033,482 @@ def getofficedata(request):
     cursor.execute(query)
     result = dictfetchall(cursor)
     return Response(result)
+
+from django.db import connection, transaction
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import pandas as pd
+import requests, time, os
+from datetime import datetime
+from time import sleep
+
+
+@api_view(["GET"])
+def process_failed_meter_readings(request):
+    # ✅ Get date range from query params or use defaults
+    start_date = request.GET.get("from", "2025-11-09")
+    end_date = request.GET.get("to", "2025-11-17")
+
+    lambda_url = "http://192.168.0.108:5000"
+    MAX_WORKERS = 20
+    LOG_INTERVAL = 100
+    base_dir = "/tmp"
+
+    # -------------------------
+    # 1️⃣ STEP: Fetch DB -> Excel
+    # -------------------------
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT cons_ac_no, rdng_img, prsnt_rdng, reading_date_db
+            FROM readingmaster
+            WHERE rdng_ocr_status = 'Failed'
+              AND prsnt_mtr_status = 'Ok'
+              AND reading_date_db BETWEEN %s AND %s
+              AND rdng_img IS NOT NULL
+              AND COALESCE(NULLIF(TRIM(prsnt_rdng), ''), NULL) IS NOT NULL
+              AND ofc_subdivision = 'KUCHAIKOT_NEW'
+              AND ofc_discom = 'NBPDCL'
+              AND rdng_img <> ''
+              LIMIT 2000;
+        """, [start_date, end_date])
+
+        readings = cursor.fetchall()
+
+    total_records = len(readings)
+    if total_records == 0:
+        return Response({"message": "No failed readings found", "from": start_date, "to": end_date})
+
+    df = pd.DataFrame(readings, columns=["cons_ac_no", "rdng_img", "prsnt_rdng", "reading_date_db"])
+    initial_excel = os.path.join(base_dir, f"failed_readings_{start_date}_to_{end_date}.xlsx")
+    df.to_excel(initial_excel, index=False)
+    print(f"✅ Step 1 complete — saved {total_records} failed readings to {initial_excel}")
+
+    # -------------------------
+    # 2️⃣ STEP: Read Excel -> Call Lambda -> Save Result Excel
+    # -------------------------
+    df_loaded = pd.read_excel(initial_excel)
+
+    def call_lambda(row):
+        cons_ac_no, img_url = row["cons_ac_no"], row["rdng_img"]
+        try:
+            r = requests.post(lambda_url, json={"image_url": img_url}, timeout=30)
+            if r.status_code == 200:
+                result = r.json().get("result", "Error")
+                return {"cons_ac_no": cons_ac_no, "result": result}
+        except Exception as e:
+            return {"cons_ac_no": cons_ac_no, "result": f"Error: {e}"}
+        return {"cons_ac_no": cons_ac_no, "result": "Error"}
+
+    results_list = []
+    start = time.time()
+    processed = 0
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = [executor.submit(call_lambda, row) for _, row in df_loaded.iterrows()]
+        for f in as_completed(futures):
+            res = f.result()
+            results_list.append(res)
+            processed += 1
+
+            if processed % LOG_INTERVAL == 0 or processed == total_records:
+                elapsed = time.time() - start
+                percent = (processed / total_records) * 100
+                avg_time_per = elapsed / processed
+                remaining = (total_records - processed) * avg_time_per
+                eta_min, eta_sec = divmod(int(remaining), 60)
+                print(
+                    f"📦 Processed {processed}/{total_records} "
+                    f"({percent:.1f}%) — {int(elapsed)}s elapsed, "
+                    f"~{eta_min}m {eta_sec}s remaining"
+                )
+
+    duration = round(time.time() - start, 2)
+
+    df_results = pd.DataFrame(results_list)
+    results_excel = os.path.join(base_dir, f"lambda_results_{start_date}_to_{end_date}.xlsx")
+    df_results.to_excel(results_excel, index=False)
+    print(f"✅ Step 2 complete — Lambda results saved to {results_excel}")
+
+    # -------------------------
+    # 3️⃣ STEP: Update DB (safe batch mode)
+    # -------------------------
+    df_passed = df_results[df_results["result"].str.lower().isin(["passed", "pass", "ok", "success"])].merge(
+        df_loaded[["cons_ac_no", "prsnt_rdng", "reading_date_db"]],
+        on="cons_ac_no",
+        how="left"
+    )
+
+    passed_accounts = [
+        (str(row.prsnt_rdng), str(row.cons_ac_no), str(row.reading_date_db))
+        for _, row in df_passed.iterrows()
+    ]
+
+    BATCH_SIZE = 500
+    MAX_RETRIES = 3
+
+    if passed_accounts:
+        total = len(passed_accounts)
+        start_time = time.time()
+
+        with connection.cursor() as cursor:
+            for i in range(0, total, BATCH_SIZE):
+                batch = passed_accounts[i:i + BATCH_SIZE]
+                for attempt in range(1, MAX_RETRIES + 1):
+                    try:
+                        with transaction.atomic():
+                            cursor.executemany("""
+                                UPDATE readingmaster
+                                SET rdng_ocr_status = 'Passed',
+                                    qc_done = 'byLambda',
+                                    prsnt_ocr_rdng = %s,
+                                    prsnt_rdng_ocr_excep = ''
+                                WHERE cons_ac_no = %s AND reading_date_db = %s;
+                            """, batch)
+
+                        done = i + len(batch)
+                        percent = (done / total) * 100
+                        elapsed = time.time() - start_time
+                        print(f"✅ Batch {i//BATCH_SIZE+1} — {done}/{total} ({percent:.1f}%) done — {elapsed:.1f}s elapsed")
+                        break
+                    except Exception as e:
+                        if "deadlock detected" in str(e).lower():
+                            print(f"⚠️ Deadlock in batch {i//BATCH_SIZE+1}, retry {attempt}/{MAX_RETRIES}…")
+                            sleep(2)
+                            continue
+                        else:
+                            raise e
+
+        print(f"✅ Step 3 complete — {len(passed_accounts)} readings updated safely in batches")
+
+    return Response({
+        "from": start_date,
+        "to": end_date,
+        "total_failed_readings": total_records,
+        "lambda_results": len(results_list),
+        "total_passed": len(passed_accounts),
+        "initial_excel": initial_excel,
+        "results_excel": results_excel,
+        "time_seconds": duration,
+        "message": f"✅ Process complete — {len(passed_accounts)}/{total_records} passed"
+    })
+
+    
+from django.db import connection, transaction
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+import pandas as pd
+import time, os
+from time import sleep
+@api_view(["POST"])
+def update_lambda_results_to_db(request):
+    """
+    Updates the database using Lambda result Excel generated earlier.
+
+    Request body:
+    {
+        "from": "2025-11-06",
+        "to": "2025-11-17"
+    }
+    """
+    start_date = request.data.get("from")
+    end_date = request.data.get("to")
+
+    if not start_date or not end_date:
+        return Response({"error": "Provide 'from' and 'to' dates."}, status=400)
+
+    # SAME FILE FORMAT AS process_failed_meter_readings()
+    results_file = f"/tmp/lambda_results_{start_date}_to_{end_date}.xlsx"
+    initial_file = f"/tmp/failed_readings_{start_date}_to_{end_date}.xlsx"
+
+    if not os.path.exists(results_file):
+        return Response({"error": f"Lambda result Excel not found: {results_file}"}, status=404)
+
+    if not os.path.exists(initial_file):
+        return Response({"error": f"Original reading Excel not found: {initial_file}"}, status=404)
+
+    start = time.time()
+
+    # Load both files
+    df_results = pd.read_excel(results_file)
+    df_initial = pd.read_excel(initial_file)
+
+    # Validate format
+    if "cons_ac_no" not in df_results.columns or "result" not in df_results.columns:
+        return Response({"error": "Invalid Lambda results excel format."}, status=400)
+
+    # Define “passed” conditions SAME AS MAIN API
+    PASS_VALUES = ["passed", "pass", "success", "ok"]
+
+    df_passed = df_results[df_results["result"].str.lower().isin(PASS_VALUES)]
+
+    if df_passed.empty:
+        return Response({"message": "No Passed results found."})
+
+    # Attach prsnt_rdng and reading_date_db
+    df_merged = df_passed.merge(
+        df_initial[["cons_ac_no", "prsnt_rdng", "reading_date_db"]],
+        on="cons_ac_no",
+        how="left"
+    )
+
+    # Prepare tuples for DB update
+    update_rows = [
+        (
+            str(row.prsnt_rdng),  # prsnt_ocr_rdng
+            str(row.cons_ac_no),
+            str(row.reading_date_db)
+        )
+        for _, row in df_merged.iterrows()
+        if pd.notna(row.reading_date_db)
+    ]
+
+    total_updates = len(update_rows)
+    if total_updates == 0:
+        return Response({"message": "No rows with valid reading_date_db to update."})
+
+    BATCH_SIZE = 500
+    MAX_RETRIES = 3
+    updated = 0
+    total_batches = (total_updates + BATCH_SIZE - 1) // BATCH_SIZE
+    start_time = time.time()
+
+    with connection.cursor() as cursor:
+        for i in range(0, total_updates, BATCH_SIZE):
+            batch = update_rows[i:i + BATCH_SIZE]
+
+            for attempt in range(1, MAX_RETRIES + 1):
+                try:
+                    with transaction.atomic():
+                        cursor.executemany("""
+                            UPDATE readingmaster
+                            SET rdng_ocr_status = 'Passed',
+                                qc_done = 'byLambda',
+                                prsnt_ocr_rdng = %s,
+                                prsnt_rdng_ocr_excep = ''
+                            WHERE cons_ac_no = %s
+                              AND reading_date_db = %s;
+                        """, batch)
+
+                    updated += len(batch)
+                    done = i + len(batch)
+                    percent = (done / total_updates) * 100
+                    elapsed = time.time() - start_time
+                    print(f"✅ Batch {i//BATCH_SIZE+1}/{total_batches} — {done}/{total_updates} ({percent:.1f}%) complete — {elapsed:.1f}s elapsed")
+                    break
+
+                except Exception as e:
+                    if "deadlock detected" in str(e).lower():
+                        print(f"⚠️ Deadlock batch {i//BATCH_SIZE+1}, retry {attempt}/{MAX_RETRIES}")
+                        sleep(2)
+                        continue
+                    raise e
+
+    duration = round(time.time() - start, 2)
+
+    return Response({
+        "from": start_date,
+        "to": end_date,
+        "total_passed": total_updates,
+        "updated_successfully": updated,
+        "results_file_used": results_file,
+        "initial_file_used": initial_file,
+        "seconds_taken": duration,
+        "message": f"DB updated successfully ({updated}/{total_updates})"
+    })
+
+@api_view(["POST"])
+def increase_lambda_accuracy(request):
+    import math
+
+    print("\n================= 🚀 STARTING ACCURACY BOOST PROCESS =================\n")
+
+    # -----------------------------
+    # 1️⃣ Read input from POST body
+    # -----------------------------
+    start_date = request.data.get("start_date")
+    end_date = request.data.get("end_date")
+    subdivision = request.data.get("subdivision")
+    discom = request.data.get("discom")
+    accuracy_increase = float(request.data.get("accuracy_increase", 5)) / 100.0  # ex: 5 → 0.05
+
+    print(f"📥 Input Received:")
+    print(f"   ➤ Start Date: {start_date}")
+    print(f"   ➤ End Date: {end_date}")
+    print(f"   ➤ Subdivision: {subdivision}")
+    print(f"   ➤ Discom: {discom}")
+    print(f"   ➤ Accuracy Increase Requested: {accuracy_increase * 100}%\n")
+
+    if not all([start_date, end_date, subdivision]):
+        print("❌ Missing required fields\n")
+        return Response({"error": "start_date, end_date, subdivision are required"}, status=400)
+
+
+    # -----------------------------------------------
+    # 2️⃣ STEP: Fetch FAILED readings
+    # -----------------------------------------------
+    print("🔍 Fetching FAILED readings from DB...")
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT cons_ac_no, rdng_img, prsnt_rdng, reading_date_db
+            FROM readingmaster
+            WHERE rdng_ocr_status = 'Failed'
+              AND prsnt_mtr_status = 'Ok'
+              AND reading_date_db BETWEEN %s AND %s
+              AND rdng_img IS NOT NULL
+              AND COALESCE(NULLIF(TRIM(prsnt_rdng), ''), NULL) IS NOT NULL
+              AND ofc_subdivision = %s
+              AND ofc_discom = %s
+              AND rdng_img <> ''
+              LIMIT 5000;
+        """, [start_date, end_date, subdivision, discom])
+
+        readings = cursor.fetchall()
+
+    print(f"   ➤ FAILED readings found: {len(readings)}\n")
+
+    if not readings:
+        print("❌ No FAILED images found. Exiting...\n")
+        return Response({"message": "No failed readings found"})
+
+    df = pd.DataFrame(readings, columns=["cons_ac_no", "rdng_img", "prsnt_rdng", "reading_date_db"])
+
+
+    # -------------------------------------------------------
+    # 3️⃣ STEP: Call Lambda on FAILED readings
+    # -------------------------------------------------------
+    print("⚙️ Calling Lambda for OCR verification...\n")
+
+    lambda_url = "http://192.168.0.108:5000"
+    MAX_WORKERS = 20
+
+    def call_lambda(row):
+        try:
+            r = requests.post(lambda_url, json={"image_url": row["rdng_img"]}, timeout=20)
+            if r.status_code == 200:
+                return {"cons_ac_no": row["cons_ac_no"], "result": r.json().get("result", "Error")}
+        except Exception as e:
+            return {"cons_ac_no": row["cons_ac_no"], "result": f"Error: {e}"}
+        return {"cons_ac_no": row["cons_ac_no"], "result": "Error"}
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    futures = []
+    results_list = []
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        for _, row in df.iterrows():
+            futures.append(executor.submit(call_lambda, row))
+
+        processed = 0
+        for f in as_completed(futures):
+            results_list.append(f.result())
+            processed += 1
+            if processed % 100 == 0:
+                print(f"   ➤ Processed {processed}/{len(futures)} lambda checks...")
+
+    print(f"   ➤ Lambda checks complete: {len(results_list)} processed\n")
+
+    df_results = pd.DataFrame(results_list)
+
+
+    # --------------------------------------------------------------------
+    # 4️⃣ STEP: Fetch current accuracy from DB
+    # --------------------------------------------------------------------
+    print("📊 Fetching current accuracy details from DB...")
+
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT 
+                SUM(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 ELSE 0 END) AS passed_count,
+                COUNT(*) FILTER (WHERE rdng_ocr_status IN ('Passed', 'Failed')) AS total_count
+            FROM readingmaster
+            WHERE reading_date_db BETWEEN %s AND %s
+              AND ofc_subdivision = %s
+              AND ofc_discom = %s
+        """, [start_date, end_date, subdivision, discom])
+
+        result = cursor.fetchone()
+
+    passed_count = result[0] or 0
+    total_count = result[1] or 1
+
+    current_accuracy = passed_count / total_count
+    desired_accuracy = min(current_accuracy + accuracy_increase, 1.0)
+
+    print(f"   ➤ Passed Count: {passed_count}")
+    print(f"   ➤ Total Count: {total_count}")
+    print(f"   ➤ Current Accuracy: {round(current_accuracy * 100, 2)}%")
+    print(f"   ➤ Desired Accuracy: {round(desired_accuracy * 100, 2)}%")
+
+    extra_pass_needed = max(0, math.ceil(desired_accuracy * total_count - passed_count))
+
+    print(f"   ➤ EXTRA PASS NEEDED: {extra_pass_needed}\n")
+
+
+    # -------------------------------------------------------------------
+    # 5️⃣ STEP: Find lambda PASSED records
+    # -------------------------------------------------------------------
+    print("🟢 Filtering lambda-passed entries...")
+
+    df_passed = df_results[
+        df_results["result"].str.lower().isin(["passed", "pass", "ok", "success"])
+    ]
+
+    print(f"   ➤ Lambda-Passed Records: {len(df_passed)}")
+
+    if extra_pass_needed > len(df_passed):
+        print("⚠️ Requested accuracy requires more passes than lambda returned!")
+        print(f"⚠️ Capping update count to lambda-passed size: {len(df_passed)}")
+        extra_pass_needed = len(df_passed)
+
+    df_passed = df_passed.merge(
+        df[["cons_ac_no", "prsnt_rdng", "reading_date_db"]],
+        on="cons_ac_no",
+        how="left"
+    ).head(extra_pass_needed)
+
+    print(f"   ➤ FINAL Records selected for update: {len(df_passed)}\n")
+
+
+    # -----------------------------------------------------------
+    # 6️⃣ STEP: Update DB
+    # -----------------------------------------------------------
+    print("📝 Updating database records...\n")
+
+    rows_to_update = [
+        (str(row.prsnt_rdng), str(row.cons_ac_no), str(row.reading_date_db))
+        for _, row in df_passed.iterrows()
+    ]
+
+    with connection.cursor() as cursor:
+        updated = 0
+        for prsnt, acno, rdate in rows_to_update:
+            cursor.execute("""
+                UPDATE readingmaster
+                SET rdng_ocr_status = 'Passed',
+                    qc_done = 'byLambda',
+                    prsnt_ocr_rdng = %s,
+                    prsnt_rdng_ocr_excep = ''
+                WHERE cons_ac_no = %s
+                  AND reading_date_db = %s;
+            """, [prsnt, acno, rdate])
+
+            updated += 1
+            if updated % 100 == 0:
+                print(f"   ➤ Updated {updated}/{len(rows_to_update)} rows...")
+
+    print(f"\n✅ DONE! Successfully updated {updated} records.")
+    print("\n================= 🎉 PROCESS COMPLETED SUCCESSFULLY =================\n")
+
+    return Response({
+        "message": "Accuracy increased successfully",
+        "subdivision": subdivision,
+        "current_accuracy": round(current_accuracy * 100, 2),
+        "desired_accuracy": round(desired_accuracy * 100, 2),
+        "extra_pass_updated": extra_pass_needed,
+        "total_lambda_passed": len(df_passed),
+        "start_date": start_date,
+        "end_date": end_date
+    })
+

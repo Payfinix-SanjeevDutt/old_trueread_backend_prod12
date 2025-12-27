@@ -113,6 +113,7 @@ urlpatterns=[
     path('newmvsummary/',views.newmvsummary,name='PersonView'),
     path('newmvcheck/',views.newmvcheck,name='PersonView'),
     path('uptime/',views.application_uptime,name='uptime'),
+    path('uptimerange/',views.application_uptime_daily, name = 'uptimeRange'),
     # path('newmvcheck1/',views.newmvcheck1,name='PersonView'),
     path('newlocationwisesummary/',views.new_locationwise_summary,name='PersonView'),
     path('newmeterreaderdetails/',views.meterreaderDetails,name='meterreaderDatails'),
@@ -200,6 +201,11 @@ urlpatterns=[
     path('reconsilation/', views.reconsilation, name='reconsilation'),
     path('deletereconsilation/', views.deletereconsilation, name='deletereconsiliation'),
     path('uploadxlsx/', views.uploadxlsx, name='uploadxlsx'),
+    path('qcStatusChange/', views.process_failed_meter_readings, name='qcstatuschange'),
+    path('updateLambdaresults/', views.update_lambda_results_to_db, name= 'updateLambdaresults'),
+    path('increaselambdaaccuracy/', views.increase_lambda_accuracy, name= 'increase_lambda_accuracy'),
+
+    
     path('supervisorlogin/', views.supervisorlogin, name='supervisorlogin'),
     path('supervisorlocation/',views.supervisorlocation,name = 'supervisorlocation')
 

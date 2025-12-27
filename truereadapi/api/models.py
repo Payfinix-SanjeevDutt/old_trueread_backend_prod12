@@ -111,9 +111,15 @@ class Consumers(models.Model):
     reading_date_db=models.DateField(null=True,blank=True)
     manual_update_flag=models.CharField( max_length=50,null=True,blank=True)
     prsnt_ocr_excep_old_values=models.CharField( max_length=50,null=True,blank=True)
+    
+    #kvah readings
     kvah_rdng = models.CharField( max_length=200, null=True, blank=True)
     kvah_img = models.CharField( max_length= 200, null=True,  blank=True)
+    kvah_manual = models.CharField( max_length= 200, null=True,  blank=True)
+    kvah_Status = models.CharField( max_length= 200, null=True,  blank=True)
+    
 
+    
     class Meta:
         db_table='readingmaster'
 
