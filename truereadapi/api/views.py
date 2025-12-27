@@ -6474,6 +6474,60 @@ def application_uptime(request):
         "start_time": start_time.strftime("%d %b %Y"),
         "end_time": end_time.strftime("%d %b %Y")
     })
+    
+    
+#for dily uptime for date range
+from datetime import datetime, timedelta
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .services.uptime_service import (
+    get_lambda_uptime_for_day,
+    calculate_penalty,
+)
+# Example helper (replace with real logic)
+
+@api_view(["GET"])
+def application_uptime_daily(request):
+    start_date_str = request.GET.get("start_date")
+    end_date_str = request.GET.get("end_date")
+
+    if not start_date_str or not end_date_str:
+        return Response(
+            {"error": "start_date and end_date are required (YYYY-MM-DD)"},
+            status=400,
+        )
+
+    start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+    end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+
+    if start_date > end_date:
+        return Response(
+            {"error": "start_date cannot be after end_date"},
+            status=400,
+        )
+
+    results = []
+    current_date = start_date
+
+    while current_date <= end_date:
+        uptime = get_lambda_uptime_for_day(
+            "new-truereadapi-prod12",
+            current_date,
+        )
+
+        results.append({
+            "date": current_date.strftime("%d %b %Y"),
+            "uptime_percentage": uptime,
+            "penalty": calculate_penalty(uptime),
+        })
+
+        current_date += timedelta(days=1)
+
+    return Response({
+        "start_date": start_date.strftime("%d %b %Y"),
+        "end_date": end_date.strftime("%d %b %Y"),
+        "daily_uptime": results,
+    })
 
 # @api_view(["GET"])
 # def application_uptime(request):
