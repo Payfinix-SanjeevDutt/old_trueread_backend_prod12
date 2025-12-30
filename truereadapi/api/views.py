@@ -6,7 +6,7 @@ from api.models import SupervsiorLocation
 import uuid
 from api.models import SupervisorLogin
 from rest_framework.decorators import api_view
-from .services.uptime_service import get_lambda_uptime, get_rds_uptime
+from .services.uptime_service import get_lambda_uptime, get_rds_uptime,get_lambda_uptime_by_range
 from datetime import date, timedelta
 from django.shortcuts import render
 from rest_framework.response import Response
@@ -6474,8 +6474,76 @@ def application_uptime(request):
         "start_time": start_time.strftime("%d %b %Y"),
         "end_time": end_time.strftime("%d %b %Y")
     })
-    
-    
+
+from django.views.decorators.csrf import csrf_exempt
+from datetime import datetime, timedelta, time
+
+
+@csrf_exempt
+@api_view(["POST"])
+def application_uptime_range(request):
+    start_date_str = request.data.get("start_date")
+    end_date_str = request.data.get("end_date")
+
+    if not start_date_str or not end_date_str:
+        return Response(
+            {"error": "start_date and end_date are required"},
+            status=400
+        )
+
+    try:
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return Response(
+            {"error": "Invalid date format. Use YYYY-MM-DD"},
+            status=400
+        )
+
+    if start_date > end_date:
+        return Response(
+            {"error": "start_date cannot be after end_date"},
+            status=400
+        )
+
+    # 🔹 CASE 1: Same date → full day
+    if start_date == end_date:
+        start_time = datetime.combine(start_date, datetime.min.time())   # 00:00:00
+        end_time = datetime.combine(end_date, datetime.max.time())       # 23:59:59
+
+    # 🔹 CASE 2: Different dates → boundary style
+    else:
+        start_time = datetime.combine(start_date, datetime.min.time())   # 00:00:00
+        end_time = datetime.combine(end_date, datetime.min.time())       # 00:00:00
+
+    # 🚨 CloudWatch safety (absolute guard)
+    if start_time >= end_time:
+        end_time = start_time + timedelta(seconds=1)
+
+    uptime = get_lambda_uptime_by_range(
+        "new-truereadapi-prod12",
+        start_time,
+        end_time
+    )
+
+    # SLA penalty logic
+    if uptime >= 95:
+        penalty = "No Penalty"
+    elif uptime >= 90:
+        penalty = "5% Penalty"
+    elif uptime >= 80:
+        penalty = "10% Penalty"
+    else:
+        penalty = "15% Penalty"
+
+    return Response({
+        "uptime_percentage": uptime,
+        "penalty": penalty,
+        "start_time": start_date.strftime("%d %b %Y"),
+        "end_time": end_date.strftime("%d %b %Y"),
+    })
+
+
 #for dily uptime for date range
 from datetime import datetime, timedelta
 from rest_framework.decorators import api_view

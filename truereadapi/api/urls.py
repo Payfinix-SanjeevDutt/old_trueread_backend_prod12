@@ -113,6 +113,7 @@ urlpatterns=[
     path('newmvsummary/',views.newmvsummary,name='PersonView'),
     path('newmvcheck/',views.newmvcheck,name='PersonView'),
     path('uptime/',views.application_uptime,name='uptime'),
+    path('uptimerangenew/',views.application_uptime_range,name='uptimerangenew'),
     path('uptimerange/',views.application_uptime_daily, name = 'uptimeRange'),
     # path('newmvcheck1/',views.newmvcheck1,name='PersonView'),
     path('newlocationwisesummary/',views.new_locationwise_summary,name='PersonView'),
