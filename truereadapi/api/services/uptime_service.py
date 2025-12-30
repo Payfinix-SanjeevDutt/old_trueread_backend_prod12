@@ -37,6 +37,41 @@ def get_lambda_uptime(function_name):
     uptime = ((total_invocations - total_errors) / total_invocations) * 100
     return round(uptime, 2)
 
+def get_lambda_uptime_by_range(function_name, start_time, end_time):
+    """
+    Calculate lambda uptime for a given date range
+    """
+
+    response = cloudwatch.get_metric_statistics(
+        Namespace="AWS/Lambda",
+        MetricName="Invocations",
+        Dimensions=[{"Name": "FunctionName", "Value": function_name}],
+        StartTime=start_time,
+        EndTime=end_time,
+        Period=86400,  # 1 day
+        Statistics=["Sum"]
+    )
+
+    error_response = cloudwatch.get_metric_statistics(
+        Namespace="AWS/Lambda",
+        MetricName="Errors",
+        Dimensions=[{"Name": "FunctionName", "Value": function_name}],
+        StartTime=start_time,
+        EndTime=end_time,
+        Period=86400,
+        Statistics=["Sum"]
+    )
+
+    total_invocations = sum(dp["Sum"] for dp in response.get("Datapoints", []))
+    total_errors = sum(dp["Sum"] for dp in error_response.get("Datapoints", []))
+
+    if total_invocations == 0:
+        return 100.0
+
+    uptime = ((total_invocations - total_errors) / total_invocations) * 100
+    return round(uptime, 2)
+
+
 def get_rds_uptime(db_instance_identifier):
     end_time = datetime.utcnow()
     start_time = end_time - timedelta(days=30)
