@@ -817,6 +817,7 @@ def metereReaderlogin(request):
 @api_view(["GET"])
 def getregdata(request):
     role_to_fetch = request.query_params.get('role', 'meterreader').lower()
+    discom = request.query_params.get('discom', 'all').upper()
 
     if role_to_fetch == 'supervisor':
         today = date.today()
@@ -824,10 +825,14 @@ def getregdata(request):
             supervisor_number=OuterRef('supervisor_number'),
             date=today
         )
+        filters = {}
+        if discom != 'ALL':
+            filters['discom'] = discom
 
         # Step 1: Valid Postgres DISTINCT ON query
         qs = (
             SupervisorLogin.objects
+            .filter(**filters)
             .filter(
                 id__in=SupervisorLogin.objects.values('supervisor_number')
                 .distinct()
