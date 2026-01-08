@@ -298,6 +298,7 @@ class SupervisorLogin(models.Model):
     mr_name = models.CharField(max_length=100, null=True, blank=True)
     mr_number = models.CharField(max_length=100, null=True, blank=True)
     supervisor_name = models.CharField(max_length=100, null=True, blank=True)
+    discom = models.CharField(max_length=100, null=True, blank=True)
 
     is_admin = models.BooleanField(default=True)
 
