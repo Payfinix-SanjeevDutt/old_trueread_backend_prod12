@@ -12329,18 +12329,18 @@ def minidashboardmonth1(request):
 
         query = f"""
         SELECT
-            count(distinct mr_id),
-            count(*) AS totalreading,
-            count(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END),
-            count(CASE WHEN rdng_ocr_status='Passed' THEN 1 END),
-            count(CASE WHEN rdng_ocr_status='Failed' THEN 1 END),
-            count(CASE WHEN prsnt_mtr_status='Meter Defective' THEN 1 END),
-            count(CASE WHEN prsnt_mtr_status='Door Locked' THEN 1 END)
+            COUNT(DISTINCT mr_id),
+            COUNT(*) AS totalreading,
+            COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Ok'),
+            COUNT(*) FILTER (WHERE rdng_ocr_status = 'Passed'),
+            COUNT(*) FILTER (WHERE rdng_ocr_status = 'Failed'),
+            COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Meter Defective'),
+            COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Door Locked')
         FROM readingmaster
         WHERE
-        reading_date_db >= DATE '{year}-{month:02d}-01'
-        AND reading_date_db <  (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
-            {where_clause}
+            reading_date_db >= DATE '{year}-{month:02d}-01'
+            AND reading_date_db < (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
+            {where_clause};
         """
     else:
         query = f"""
@@ -12355,6 +12355,7 @@ def minidashboardmonth1(request):
         FROM combinedmonth_view
         """
 
+    print("minidashboardmonth1",query)
     cursor.execute(query)
     row = cursor.fetchone()
 
@@ -12538,7 +12539,7 @@ def dashboardagencywise1(request):
         FROM combinedmonth_view
         GROUP BY agency
         """
-
+    print("dashboardagencywise1",query)
     cursor.execute(query)
     result = cursor.fetchall()
 
