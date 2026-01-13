@@ -2,7 +2,7 @@ from datetime import date
 from django.db.models import Q, Exists, OuterRef
 from calendar import monthrange
 from django.db import DatabaseError, IntegrityError
-from api.models import SupervsiorLocation
+from api.models import SupervisorLocation
 import uuid
 from api.models import SupervisorLogin
 from rest_framework.decorators import api_view
@@ -821,7 +821,7 @@ def getregdata(request):
 
     if role_to_fetch == 'supervisor':
         today = date.today()
-        location_exists = SupervsiorLocation.objects.filter(
+        location_exists = SupervisorLocation.objects.filter(
             supervisor_number=OuterRef('supervisor_number'),
             date=today
         )
@@ -6332,7 +6332,7 @@ def supervisorlocation(request):
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO supervsiorlocation 
+                INSERT INTO SupervisorLocation 
                     (supervisor_number, geo_lat, geo_long, date)
                 VALUES (%s, %s, %s, %s)
                 ON CONFLICT (supervisor_number, date)
@@ -6895,7 +6895,7 @@ def clusterstestnew(request):
                 supervisor_number = mr_id_value[4:]
                 print("-------->>>>", today, supervisor_number)
                 try:
-                    locations = SupervsiorLocation.objects.filter(
+                    locations = SupervisorLocation.objects.filter(
                         supervisor_number=supervisor_number,
                         date=today
                     ).values('geo_lat', 'geo_long', 'supervisor_number', 'date')
@@ -12307,36 +12307,44 @@ def meter_reading_summary_new(request):
 # MATERIALIZED VIEWS APIS
 @api_view(["POST"])
 def minidashboardmonth1(request):
-    month = date.today().month
-    today = date.today()
-    print("month", month)
-
-    # clause = 'where'
-    # if agency != 'null':
-    #     clause += f"agency='{agency}'"
-    # if discom != 'null':
-    #     clause += f"and ofc_discom='{discom}'"
-
-    # print("clause---------->", clause)
-    clause = ""
     cursor = connection.cursor()
-    filters = request.data.get("filters", None)
-    try:
-        if filters:
-            clause += " where "
-            for i, (key, value) in enumerate(filters.items()):
-                if i > 0:
-                    clause += "AND "
+    filters = request.data.get("filters", {})
+    conditions = []
 
-                if key == "agency":
-                    clause += f"agency='{value}'"
-                    pass
-                if key == "ofc_discom":
-                    clause += f"discom='{value}'"
-                    pass
-    except:
-        pass
-    query = f"""select 
+    has_year_month = "year" in filters and "month" in filters
+
+    # common filters
+    if "agency" in filters:
+        conditions.append(f"bl_agnc_name='{filters['agency']}'")
+    if "ofc_discom" in filters:
+        conditions.append(f"ofc_discom='{filters['ofc_discom']}'")
+
+    where_clause = ""
+    if conditions:
+        where_clause = " AND " + " AND ".join(conditions)
+
+    if has_year_month:
+        year = int(filters["year"])
+        month = int(filters["month"])
+
+        query = f"""
+        SELECT
+            COUNT(DISTINCT mr_id),
+            COUNT(*) AS totalreading,
+            COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Ok'),
+            COUNT(*) FILTER (WHERE rdng_ocr_status = 'Passed'),
+            COUNT(*) FILTER (WHERE rdng_ocr_status = 'Failed'),
+            COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Meter Defective'),
+            COUNT(*) FILTER (WHERE prsnt_mtr_status = 'Door Locked')
+        FROM readingmaster
+        WHERE
+            reading_date_db >= DATE '{year}-{month:02d}-01'
+            AND reading_date_db < (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
+            {where_clause};
+        """
+    else:
+        query = f"""
+        SELECT
             count(distinct meter_reader_id),
             SUM(TotalReading),
             SUM(Ok),
@@ -12344,141 +12352,224 @@ def minidashboardmonth1(request):
             SUM(Failed),
             SUM(MeterDefective),
             SUM(DoorLocked)
-            from combinedmonth_view  {clause}
-    """
-    print("---------------------rtyui", query)
+        FROM combinedmonth_view
+        """
 
+    print("minidashboardmonth1",query)
     cursor.execute(query)
+    row = cursor.fetchone()
 
-    result = cursor.fetchall()
-
-    print(result)
-    try:
-        for row in result:
-            print("insisde for ")
-            metervisionaireadings = row[3]
-            metervisionaireadingswithocrexception = row[4]
-            doorlockedreadings = row[6]
-            meterdefectivereadings = row[5]
-            okreadings = row[2]
-            mrid = row[0]
-
-        newdict = {
-            "mrid": int(mrid),
-            "okreadings": int(okreadings),
-            "ocrreadings": int(metervisionaireadings),
-            "ocrwithexception": int(metervisionaireadingswithocrexception),
-            "doorlocked": int(doorlockedreadings),
-            "meterdefective": int(meterdefectivereadings),
-            "totalreadings": int(row[1]),
-        }
-        print(newdict)
-
-        return Response(newdict)
-    except:
+    if not row:
         return Response([])
 
+    return Response({
+        "mrid": int(row[0]),
+        "totalreadings": int(row[1]),
+        "okreadings": int(row[2]),
+        "ocrreadings": int(row[3]),
+        "ocrwithexception": int(row[4]),
+        "meterdefective": int(row[5]),
+        "doorlocked": int(row[6]),
+    })
+
+
+# @api_view(["POST"])
+# def dashboardagencywise1(request):
+#     today = date.today()
+#     thismonth = today.strftime("%Y-%m")
+#     year = thismonth.split("-")[0]
+#     month = thismonth.split("-")[1]
+#     new = []
+
+#     clause = ""
+#     cursor = connection.cursor()
+#     filters = request.data.get("filters", None)
+
+#     def listfun(dict):
+#         print("dict---->", dict)
+#         if (
+#             dict["agency"] == "BCITS"
+#             or dict["agency"] == "DATA INGENIOUS"
+#             or dict["agency"] == "Fluent Grid"
+#             or dict["agency"] == "Quess Corp(Ikya Rural)"
+#         ):
+#             pass
+#         else:
+#             new.append(dict.copy())
+#         return new
+
+#     try:
+#         if filters:
+#             clause += " Where "
+#             for i, (key, value) in enumerate(filters.items()):
+#                 if i > 0:
+#                     clause += "AND "
+
+#                 if key == "agency":
+#                     clause += f"agency='{value}'"
+
+#                 if key == "ofc_discom":
+#                     clause += f"discom='{value}'"
+
+#     except:
+#         pass
+#     newdict = {}
+
+#     #     query = (f"""select
+#     #              agency,
+#     #              SUM(billed_consumers),
+#     #              SUM(ok_readings),
+#     #              SUM(OCRwithoutException),
+#     # SUM(OCRwithException),SUM(MeterDefective),SUM(DoorLocked)
+#     # from my_materialized_view where month={month} {clause}group by agency
+#     #     """)
+#     query = f"""
+#            select 
+#         agency,
+#         SUM(TotalReading),
+#         SUM(Ok),
+#         SUM(Passed),
+#         SUM(Failed),
+#         SUM(MeterDefective),SUM(DoorLocked)
+#         from combinedmonth_view {clause} group by agency
+#        """
+
+#     print("query", query)
+
+#     cursor.execute(query)
+#     result = cursor.fetchall()
+#     try:
+#         for row in result:
+#             total = row[1]
+#             okreadings = row[2]
+#             ocrreadings = row[3]
+#             ocrwithexcep = row[4]
+#             meterdefective = row[5]
+#             doorlocked = row[6]
+#             # Percentage
+#             okreadpercent = math.floor((okreadings / total) * 100)
+#             ocrreadingpercent = math.floor(
+#                 ((ocrreadings / okreadings) if okreadings else 0) * 100
+#             )
+#             ocrwithexceppercent = math.floor(
+#                 ((ocrwithexcep / okreadings) if okreadings else 0) * 100
+#             )
+#             meterdefectivepercent = math.floor((meterdefective / total) * 100)
+#             doorlockedpercent = math.floor((doorlocked / total) * 100)
+
+#             # add to dictionary
+#             newdict["agency"] = row[0]
+#             newdict["totalReadings"] = int(row[1])
+#             newdict["OKreadings"] = int(okreadings)
+#             newdict["OKreadingspercent"] = okreadpercent
+#             newdict["OCRReadings"] = int(ocrreadings)
+#             newdict["OCRReadingspercent"] = ocrreadingpercent
+#             newdict["OCRwithException"] = int(ocrwithexcep)
+#             newdict["OCRwithExceptionpercent"] = ocrwithexceppercent
+#             newdict["MeterDefective"] = int(meterdefective)
+#             newdict["MeterDefectivepercent"] = meterdefectivepercent
+#             newdict["DoorLocked"] = int(doorlocked)
+#             newdict["DoorLockedpercent"] = doorlockedpercent
+#             # add to list
+#             newdata = listfun(newdict)
+#         return Response(newdata)
+#     except:
+#         return Response([])
 
 @api_view(["POST"])
 def dashboardagencywise1(request):
-    today = date.today()
-    thismonth = today.strftime("%Y-%m")
-    year = thismonth.split("-")[0]
-    month = thismonth.split("-")[1]
+    cursor = connection.cursor()
+    filters = request.data.get("filters", {})
     new = []
 
-    clause = ""
-    cursor = connection.cursor()
-    filters = request.data.get("filters", None)
+    has_year_month = "year" in filters and "month" in filters
+    conditions = []
 
-    def listfun(dict):
-        print("dict---->", dict)
-        if (
-            dict["agency"] == "BCITS"
-            or dict["agency"] == "DATA INGENIOUS"
-            or dict["agency"] == "Fluent Grid"
-            or dict["agency"] == "Quess Corp(Ikya Rural)"
-        ):
-            pass
-        else:
-            new.append(dict.copy())
+    def listfun(d):
+        if d["agency"] not in [
+            "BCITS",
+            "DATA INGENIOUS",
+            "Fluent Grid",
+            "Quess Corp(Ikya Rural)",
+        ]:
+            new.append(d.copy())
         return new
 
-    try:
-        if filters:
-            clause += " Where "
-            for i, (key, value) in enumerate(filters.items()):
-                if i > 0:
-                    clause += "AND "
+    # common filters
+    if "agency" in filters:
+        conditions.append(f"agency='{filters['agency']}'")
+    if "ofc_discom" in filters:
+        conditions.append(f"discom='{filters['ofc_discom']}'")
 
-                if key == "agency":
-                    clause += f"agency='{value}'"
+    clause = ""
+    if conditions:
+        clause = " AND " + " AND ".join(conditions)
 
-                if key == "ofc_discom":
-                    clause += f"discom='{value}'"
+    if has_year_month:
+        year = int(filters["year"])
+        month = int(filters["month"])
 
-    except:
-        pass
-    newdict = {}
+        query = f"""
+        SELECT
+            bl_agnc_name AS agency,
+            count(*) AS total,
+            count(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END) AS ok,
+            count(CASE WHEN rdng_ocr_status='Passed' THEN 1 END) AS passed,
+            count(CASE WHEN rdng_ocr_status='Failed' THEN 1 END) AS failed,
+            count(CASE WHEN prsnt_mtr_status='Meter Defective' THEN 1 END) AS meterdefective,
+            count(CASE WHEN prsnt_mtr_status='Door Locked' THEN 1 END) AS doorlocked
+        FROM readingmaster
+        WHERE
+            reading_date_db >= DATE '{year}-{month:02d}-01'
+            AND reading_date_db <  (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
+            {clause}
 
-    #     query = (f"""select
-    #              agency,
-    #              SUM(billed_consumers),
-    #              SUM(ok_readings),
-    #              SUM(OCRwithoutException),
-    # SUM(OCRwithException),SUM(MeterDefective),SUM(DoorLocked)
-    # from my_materialized_view where month={month} {clause}group by agency
-    #     """)
-    query = f"""
-           select 
-        agency,
-        SUM(TotalReading),
-        SUM(Ok),
-        SUM(Passed),
-        SUM(Failed),
-        SUM(MeterDefective),SUM(DoorLocked)
-        from combinedmonth_view {clause} group by agency
-       """
-
-    print("query", query)
-
+        GROUP BY bl_agnc_name
+        """
+    else:
+        query = f"""
+        SELECT
+            agency,
+            SUM(TotalReading),
+            SUM(Ok),
+            SUM(Passed),
+            SUM(Failed),
+            SUM(MeterDefective),
+            SUM(DoorLocked)
+        FROM combinedmonth_view
+        GROUP BY agency
+        """
+    print("dashboardagencywise1",query)
     cursor.execute(query)
     result = cursor.fetchall()
+
     try:
         for row in result:
             total = row[1]
-            okreadings = row[2]
-            ocrreadings = row[3]
-            ocrwithexcep = row[4]
-            meterdefective = row[5]
+            ok = row[2]
+            passed = row[3]
+            failed = row[4]
+            meterdef = row[5]
             doorlocked = row[6]
-            # Percentage
-            okreadpercent = math.floor((okreadings / total) * 100)
-            ocrreadingpercent = math.floor(
-                ((ocrreadings / okreadings) if okreadings else 0) * 100
-            )
-            ocrwithexceppercent = math.floor(
-                ((ocrwithexcep / okreadings) if okreadings else 0) * 100
-            )
-            meterdefectivepercent = math.floor((meterdefective / total) * 100)
-            doorlockedpercent = math.floor((doorlocked / total) * 100)
 
-            # add to dictionary
-            newdict["agency"] = row[0]
-            newdict["totalReadings"] = int(row[1])
-            newdict["OKreadings"] = int(okreadings)
-            newdict["OKreadingspercent"] = okreadpercent
-            newdict["OCRReadings"] = int(ocrreadings)
-            newdict["OCRReadingspercent"] = ocrreadingpercent
-            newdict["OCRwithException"] = int(ocrwithexcep)
-            newdict["OCRwithExceptionpercent"] = ocrwithexceppercent
-            newdict["MeterDefective"] = int(meterdefective)
-            newdict["MeterDefectivepercent"] = meterdefectivepercent
-            newdict["DoorLocked"] = int(doorlocked)
-            newdict["DoorLockedpercent"] = doorlockedpercent
-            # add to list
-            newdata = listfun(newdict)
-        return Response(newdata)
+            data = {
+                "agency": row[0],
+                "totalReadings": int(total),
+                "OKreadings": int(ok),
+                "OKreadingspercent": math.floor((ok / total) * 100) if total else 0,
+                "OCRReadings": int(passed),
+                "OCRReadingspercent": math.floor((passed / ok) * 100) if ok else 0,
+                "OCRwithException": int(failed),
+                "OCRwithExceptionpercent": math.floor((failed / ok) * 100) if ok else 0,
+                "MeterDefective": int(meterdef),
+                "MeterDefectivepercent": math.floor((meterdef / total) * 100) if total else 0,
+                "DoorLocked": int(doorlocked),
+                "DoorLockedpercent": math.floor((doorlocked / total) * 100) if total else 0,
+            }
+
+            listfun(data)
+
+        return Response(new)
     except:
         return Response([])
 
@@ -12547,53 +12638,132 @@ def dashboardagencywise1(request):
 #     return Response(result)
 
 
+# @api_view(["POST"])
+# def exceptionlist1(request):
+#     today = date.today()
+#     thismonth = today.strftime("%Y-%m")
+#     year = thismonth.split("-")[0]
+#     clause = ""
+#     cursor = connection.cursor()
+#     filters = request.data.get("filters", None)
+#     result = {}
+
+#     try:
+#         if filters:
+#             clause += " WHERE "
+#             for i, (key, value) in enumerate(filters.items()):
+#                 if i > 0:
+#                     clause += "AND "
+
+#                 if key == "agency":
+#                     clause += f"agency='{value}'"
+#                     pass
+#                 if key == "ofc_discom":
+#                     clause += f"discom='{value}'"
+#                     pass
+#     except:
+#         pass
+
+#     query = f"""
+#    SELECT
+#     CAST(SUM(TotalReading)AS INTEGER)as total,
+#     CAST(SUM(Ok)AS INTEGER)as ok_readings,
+#     CAST(SUM(Passed)AS INTEGER)as passed,
+#     CAST(SUM(Failed)AS INTEGER)as failed,
+#     CAST(SUM(incorrectreading)AS INTEGER)as "Incorrect Reading",
+#     CAST(SUM(spoofedimage)AS INTEGER)as "Image Spoofed",
+#     CAST(SUM(imageblur)AS INTEGER)as "Image blur",
+#     CAST(SUM(parametersunavailable)AS INTEGER)as "Parameters Unavailable",
+#     CAST(SUM(meterdirty)AS INTEGER)as "Meter Dirty",
+#     CAST(SUM(parametersmismatch)AS INTEGER)as "Parameters Mismatch"
+#     FROM combinedmonth_view {clause}
+#     """
+
+#     print("QUERY-->", query)
+#     cursor.execute(query)
+#     row = cursor.fetchone()
+
+#     if row:
+#         result = {
+#             "total": row[0],
+#             "ok_readings": row[1],
+#             "passed": row[2],
+#             "failed": row[3],
+#             "Incorrect Reading": row[4],
+#             "Image Spoofed": row[5],
+#             "Image blur": row[6],
+#             "Parameters Unavailable": row[7],
+#             "Meter Dirty": row[8],
+#             "Parameters Mismatch": row[9],
+#         }
+
+#     return Response({"total": result["total"], "data": result})
+
 @api_view(["POST"])
 def exceptionlist1(request):
-    today = date.today()
-    thismonth = today.strftime("%Y-%m")
-    year = thismonth.split("-")[0]
-    clause = ""
     cursor = connection.cursor()
-    filters = request.data.get("filters", None)
-    result = {}
+    filters = request.data.get("filters", {})
+    conditions = []
 
-    try:
-        if filters:
-            clause += " WHERE "
-            for i, (key, value) in enumerate(filters.items()):
-                if i > 0:
-                    clause += "AND "
+    has_year_month = "year" in filters and "month" in filters
 
-                if key == "agency":
-                    clause += f"agency='{value}'"
-                    pass
-                if key == "ofc_discom":
-                    clause += f"discom='{value}'"
-                    pass
-    except:
-        pass
+    if "agency" in filters:
+        conditions.append(f"agency='{filters['agency']}'")
+    if "ofc_discom" in filters:
+        conditions.append(f"discom='{filters['ofc_discom']}'")
 
-    query = f"""
-   SELECT
-    CAST(SUM(TotalReading)AS INTEGER)as total,
-    CAST(SUM(Ok)AS INTEGER)as ok_readings,
-    CAST(SUM(Passed)AS INTEGER)as passed,
-    CAST(SUM(Failed)AS INTEGER)as failed,
-    CAST(SUM(incorrectreading)AS INTEGER)as "Incorrect Reading",
-    CAST(SUM(spoofedimage)AS INTEGER)as "Image Spoofed",
-    CAST(SUM(imageblur)AS INTEGER)as "Image blur",
-    CAST(SUM(parametersunavailable)AS INTEGER)as "Parameters Unavailable",
-    CAST(SUM(meterdirty)AS INTEGER)as "Meter Dirty",
-    CAST(SUM(parametersmismatch)AS INTEGER)as "Parameters Mismatch"
-    FROM combinedmonth_view {clause}
-    """
+    clause = ""
+    if conditions:
+        clause = " WHERE " + " AND ".join(conditions)
 
-    print("QUERY-->", query)
+    if has_year_month:
+        year = int(filters["year"])
+        month = int(filters["month"])
+
+        query = f"""
+        SELECT
+            count(*) AS total,
+            count(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END) AS ok_readings,
+            count(CASE WHEN rdng_ocr_status='Passed' THEN 1 END) AS passed,
+            count(CASE WHEN rdng_ocr_status='Failed' THEN 1 END) AS failed,
+            count(CASE WHEN prsnt_rdng_ocr_excep='Incorrect Reading' THEN 1 END) AS incorrectreading,
+            count(CASE WHEN prsnt_rdng_ocr_excep='Spoofed Image' THEN 1 END) AS spoofedimage,
+            count(CASE WHEN prsnt_rdng_ocr_excep='Image blur' THEN 1 END) AS imageblur,
+            count(CASE WHEN reading_parameter_type='Parameters Unavailable' THEN 1 END) AS parametersunavailable,
+            count(CASE WHEN prsnt_rdng_ocr_excep='Meter Dirty' THEN 1 END) AS meterdirty,
+            count(CASE WHEN reading_parameter_type='Parameters Mismatch' THEN 1 END) AS parametersmismatch
+        FROM readingmaster
+        WHERE reading_date_db >= DATE '{year}-{month:02d}-01'
+        AND reading_date_db <  (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
+
+        """
+    else:
+        query = f"""
+        SELECT
+            CAST(SUM(TotalReading) AS INTEGER),
+            CAST(SUM(Ok) AS INTEGER),
+            CAST(SUM(Passed) AS INTEGER),
+            CAST(SUM(Failed) AS INTEGER),
+            CAST(SUM(incorrectreading) AS INTEGER),
+            CAST(SUM(spoofedimage) AS INTEGER),
+            CAST(SUM(imageblur) AS INTEGER),
+            CAST(SUM(parametersunavailable) AS INTEGER),
+            CAST(SUM(meterdirty) AS INTEGER),
+            CAST(SUM(parametersmismatch) AS INTEGER)
+        FROM combinedmonth_view
+        {clause}
+        """
+
     cursor.execute(query)
+    print("exceptionlist1",query)
     row = cursor.fetchone()
 
-    if row:
-        result = {
+    if not row:
+        return Response({"total": 0, "data": {}})
+
+    return Response({
+        "total": row[0],
+        "data": {
             "total": row[0],
             "ok_readings": row[1],
             "passed": row[2],
@@ -12605,8 +12775,7 @@ def exceptionlist1(request):
             "Meter Dirty": row[8],
             "Parameters Mismatch": row[9],
         }
-
-    return Response({"total": result["total"], "data": result})
+    })
 
 
 # @api_view(['POST'])
