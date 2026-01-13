@@ -305,18 +305,19 @@ class SupervisorLogin(models.Model):
     class Meta:
         db_table = "supervisorlogin"
 
-class SupervsiorLocation(models.Model):
+class SupervisorLocation(models.Model):
     id = models.AutoField(primary_key=True)
-    supervisor_number = models.CharField(max_length=15, unique=False)
-    geo_lat = models.CharField(max_length=300,null=True,blank=True)
-    geo_long = models.CharField(max_length=300,null=True,blank=True)
-    date = models.DateField(null=True, blank=True)
-
+    supervisor_number = models.CharField(max_length=15)
+    date = models.DateField()
+ 
+    # stores all movement for that day
+    meta = models.JSONField(default=dict)
+ 
     class Meta:
-        db_table = "supervsiorlocation"
+        db_table = "supervisor_location"
         constraints = [
             models.UniqueConstraint(
-                fields=['supervisor_number', 'date'],
-                name='unique_supervisor_date'
+                fields=["supervisor_number", "date"],
+                name="unique_supervisor_per_day"
             )
         ]
