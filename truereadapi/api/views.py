@@ -2,7 +2,7 @@ from datetime import date
 from django.db.models import Q, Exists, OuterRef
 from calendar import monthrange
 from django.db import DatabaseError, IntegrityError
-from api.models import SupervisorLocation
+from api.models import SupervsiorLocation
 import uuid
 from api.models import SupervisorLogin
 from rest_framework.decorators import api_view
@@ -821,7 +821,7 @@ def getregdata(request):
 
     if role_to_fetch == 'supervisor':
         today = date.today()
-        location_exists = SupervisorLocation.objects.filter(
+        location_exists = SupervsiorLocation.objects.filter(
             supervisor_number=OuterRef('supervisor_number'),
             date=today
         )
@@ -6895,7 +6895,7 @@ def clusterstestnew(request):
                 supervisor_number = mr_id_value[4:]
                 print("-------->>>>", today, supervisor_number)
                 try:
-                    locations = SupervisorLocation.objects.filter(
+                    locations = SupervsiorLocation.objects.filter(
                         supervisor_number=supervisor_number,
                         date=today
                     ).values('geo_lat', 'geo_long', 'supervisor_number', 'date')
@@ -12499,7 +12499,7 @@ def dashboardagencywise1(request):
     if "agency" in filters:
         conditions.append(f"agency='{filters['agency']}'")
     if "ofc_discom" in filters:
-        conditions.append(f"discom='{filters['ofc_discom']}'")
+        conditions.append(f"ofc_discom='{filters['ofc_discom']}'")
 
     clause = ""
     if conditions:
