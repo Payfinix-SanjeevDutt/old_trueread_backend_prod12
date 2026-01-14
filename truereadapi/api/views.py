@@ -12404,23 +12404,23 @@ def meter_reading_summary_new(request):
 def minidashboardmonth1(request):
     cursor = connection.cursor()
     filters = request.data.get("filters", {})
-    conditions = []
-
+    
+    agency = filters.get("agency")
+    ofc_discom = filters.get("ofc_discom")
     has_year_month = "year" in filters and "month" in filters
-
-    # common filters
-    if "agency" in filters:
-        conditions.append(f"bl_agnc_name='{filters['agency']}'")
-    if "ofc_discom" in filters:
-        conditions.append(f"ofc_discom='{filters['ofc_discom']}'")
-
-    where_clause = ""
-    if conditions:
-        where_clause = " AND " + " AND ".join(conditions)
 
     if has_year_month:
         year = int(filters["year"])
         month = int(filters["month"])
+        
+        # Build conditions specifically for readingmaster
+        conditions = []
+        if agency:
+            conditions.append(f"bl_agnc_name='{agency}'")
+        if ofc_discom:
+            conditions.append(f"ofc_discom='{ofc_discom}'") # Table uses ofc_discom
+        
+        extra_filters = " AND " + " AND ".join(conditions) if conditions else ""
 
         query = f"""
         SELECT
@@ -12435,9 +12435,17 @@ def minidashboardmonth1(request):
         WHERE
             reading_date_db >= DATE '{year}-{month:02d}-01'
             AND reading_date_db < (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
-            {where_clause};
+            {extra_filters};
         """
     else:
+        conditions = []
+        if agency:
+            conditions.append(f"bl_agnc_name='{agency}'")
+        if ofc_discom:
+            conditions.append(f"discom='{ofc_discom}'") # View uses discom
+        
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
         query = f"""
         SELECT
             count(distinct meter_reader_id),
@@ -12448,26 +12456,29 @@ def minidashboardmonth1(request):
             SUM(MeterDefective),
             SUM(DoorLocked)
         FROM combinedmonth_view
+        {where_clause}
         """
 
-    print("minidashboardmonth1",query)
+    # print("minidashboardmonth1 query:", query)
     cursor.execute(query)
     row = cursor.fetchone()
 
-    if not row:
-        return Response([])
+    if not row or row[0] is None:
+        return Response({
+            "mrid": 0, "totalreadings": 0, "okreadings": 0, 
+            "ocrreadings": 0, "ocrwithexception": 0, 
+            "meterdefective": 0, "doorlocked": 0
+        })
 
     return Response({
-        "mrid": int(row[0]),
-        "totalreadings": int(row[1]),
-        "okreadings": int(row[2]),
-        "ocrreadings": int(row[3]),
-        "ocrwithexception": int(row[4]),
-        "meterdefective": int(row[5]),
-        "doorlocked": int(row[6]),
+        "mrid": int(row[0] or 0),
+        "totalreadings": int(row[1] or 0),
+        "okreadings": int(row[2] or 0),
+        "ocrreadings": int(row[3] or 0),
+        "ocrwithexception": int(row[4] or 0),
+        "meterdefective": int(row[5] or 0),
+        "doorlocked": int(row[6] or 0),
     })
-
-
 # @api_view(["POST"])
 # def dashboardagencywise1(request):
 #     today = date.today()
@@ -12578,7 +12589,8 @@ def dashboardagencywise1(request):
     new = []
 
     has_year_month = "year" in filters and "month" in filters
-    conditions = []
+    agency_filter = filters.get("agency")
+    discom_filter = filters.get("ofc_discom")
 
     def listfun(d):
         if d["agency"] not in [
@@ -12590,19 +12602,18 @@ def dashboardagencywise1(request):
             new.append(d.copy())
         return new
 
-    # common filters
-    if "agency" in filters:
-        conditions.append(f"agency='{filters['agency']}'")
-    if "ofc_discom" in filters:
-        conditions.append(f"ofc_discom='{filters['ofc_discom']}'")
-
-    clause = ""
-    if conditions:
-        clause = " AND " + " AND ".join(conditions)
-
     if has_year_month:
         year = int(filters["year"])
         month = int(filters["month"])
+
+        # Table-specific conditions
+        conditions = []
+        if agency_filter:
+            conditions.append(f"bl_agnc_name='{agency_filter}'")
+        if discom_filter:
+            conditions.append(f"ofc_discom='{discom_filter}'") # Table uses ofc_discom
+        
+        clause = " AND " + " AND ".join(conditions) if conditions else ""
 
         query = f"""
         SELECT
@@ -12616,12 +12627,20 @@ def dashboardagencywise1(request):
         FROM readingmaster
         WHERE
             reading_date_db >= DATE '{year}-{month:02d}-01'
-            AND reading_date_db <  (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
+            AND reading_date_db < (DATE '{year}-{month:02d}-01' + INTERVAL '1 month')
             {clause}
-
         GROUP BY bl_agnc_name
         """
     else:
+        # View-specific conditions
+        conditions = []
+        if agency_filter:
+            conditions.append(f"agency='{agency_filter}'")
+        if discom_filter:
+            conditions.append(f"discom='{discom_filter}'") # View uses discom
+        
+        where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
+
         query = f"""
         SELECT
             agency,
@@ -12632,20 +12651,22 @@ def dashboardagencywise1(request):
             SUM(MeterDefective),
             SUM(DoorLocked)
         FROM combinedmonth_view
+        {where_clause}
         GROUP BY agency
         """
-    print("dashboardagencywise1",query)
+
+    # print("dashboardagencywise1", query)
     cursor.execute(query)
     result = cursor.fetchall()
 
     try:
         for row in result:
-            total = row[1]
-            ok = row[2]
-            passed = row[3]
-            failed = row[4]
-            meterdef = row[5]
-            doorlocked = row[6]
+            total = row[1] or 0
+            ok = row[2] or 0
+            passed = row[3] or 0
+            failed = row[4] or 0
+            meterdef = row[5] or 0
+            doorlocked = row[6] or 0
 
             data = {
                 "agency": row[0],
@@ -12661,13 +12682,12 @@ def dashboardagencywise1(request):
                 "DoorLocked": int(doorlocked),
                 "DoorLockedpercent": math.floor((doorlocked / total) * 100) if total else 0,
             }
-
             listfun(data)
 
         return Response(new)
-    except:
+    except Exception as e:
+        print(f"Error: {e}")
         return Response([])
-
 
 # @api_view(['POST'])
 # def exceptionlist1(request):
