@@ -6314,43 +6314,120 @@ def supervisorlogin(request):
 # deeepak
 
 
+# @api_view(["POST"])
+# def supervisorlocation(request):
+#     supervisor_number = request.data.get("supervisor_number")
+#     geo_lat = request.data.get("geo_lat")
+#     geo_long = request.data.get("geo_long")
+#     date_str = request.data.get("date")
+
+#     if not all([supervisor_number, geo_lat, geo_long, date_str]):
+#         return Response({"status": False, "message": "Missing fields"}, status=400)
+
+#     try:
+#         date = datetime.strptime(date_str, "%Y-%m-%d").date()
+#     except ValueError:
+#         return Response({"status": False, "message": "Invalid date"}, status=400)
+
+#     try:
+#         with connection.cursor() as cursor:
+#             cursor.execute("""
+#                 INSERT INTO SupervisorLocation 
+#                     (supervisor_number, geo_lat, geo_long, date)
+#                 VALUES (%s, %s, %s, %s)
+#                 ON CONFLICT (supervisor_number, date)
+#                 DO UPDATE SET
+#                     geo_lat = EXCLUDED.geo_lat,
+#                     geo_long = EXCLUDED.geo_long
+#                 RETURNING (xmax = 0) AS inserted
+#             """, [supervisor_number, geo_lat, geo_long, date])
+
+#             result = cursor.fetchone()
+#             created = result[0] if result else False
+
+#         message = "location added" if created else "location updated"
+#         return Response({"status": True, "message": message})
+
+#     except Exception as e:
+#         return Response({"status": False, "message": f"Database error: {str(e)}"}, status=500)
+# deeepak
+from datetime import datetime
+from django.db import connection
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+ 
 @api_view(["POST"])
 def supervisorlocation(request):
     supervisor_number = request.data.get("supervisor_number")
     geo_lat = request.data.get("geo_lat")
     geo_long = request.data.get("geo_long")
-    date_str = request.data.get("date")
-
+    date_str = request.dataget = request.data.get("date")
+ 
     if not all([supervisor_number, geo_lat, geo_long, date_str]):
         return Response({"status": False, "message": "Missing fields"}, status=400)
-
+ 
+    # Parse datetime
     try:
-        date = datetime.strptime(date_str, "%Y-%m-%d").date()
-    except ValueError:
-        return Response({"status": False, "message": "Invalid date"}, status=400)
-
+        dt = datetime.strptime(date_str, "%Y-%m-%d %I:%M:%S %p")
+        date = dt.date()
+        time = dt.strftime("%H:%M:%S")
+ 
+    except:
+        return Response({"status": False, "message": "Invalid date format"}, status=400)
+ 
     try:
         with connection.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO SupervisorLocation 
-                    (supervisor_number, geo_lat, geo_long, date)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO supervsiorlocation
+                    (supervisor_number, date, meta, created_at, updated_at)
+                VALUES (
+                    %s,%s,
+                    jsonb_build_object(
+                        'path', jsonb_build_array(
+                            jsonb_build_object(
+                                'time', %s,
+                                'lat', %s,
+                                'lng', %s
+                            )
+                        ),
+                        'last_seen', %s,
+                        'total_points', 1
+                    ),
+                    NOW(),NOW()
+                )
+ 
                 ON CONFLICT (supervisor_number, date)
                 DO UPDATE SET
-                    geo_lat = EXCLUDED.geo_lat,
-                    geo_long = EXCLUDED.geo_long
-                RETURNING (xmax = 0) AS inserted
-            """, [supervisor_number, geo_lat, geo_long, date])
-
-            result = cursor.fetchone()
-            created = result[0] if result else False
-
-        message = "location added" if created else "location updated"
-        return Response({"status": True, "message": message})
-
+                    meta =
+                        jsonb_set(
+                            jsonb_set(
+                                jsonb_set(
+                                    supervsiorlocation.meta,
+                                    '{path}',
+                                    (supervsiorlocation.meta->'path') || jsonb_build_array(
+                                        jsonb_build_object(
+                                            'time', %s,
+                                            'lat', %s,
+                                            'lng', %s
+                                        )
+                                    )
+                                ),
+                                '{last_seen}',
+                                to_jsonb(%s::text)
+                            ),
+                            '{total_points}',
+                            to_jsonb((supervsiorlocation.meta->>'total_points')::int + 1)
+                        ),
+                    updated_at = NOW();
+            """, [
+                supervisor_number, date,
+                time, geo_lat, geo_long, time,
+                time, geo_lat, geo_long, time
+            ])
+        return Response({"status": True, "message": "Location recorded"})
     except Exception as e:
-        return Response({"status": False, "message": f"Database error: {str(e)}"}, status=500)
-
+        print("DB ERROR:", e)
+        return Response({"status": False, "message": str(e)}, status=500)
 
 @api_view(["POST"])
 def newmvcheck(request):
@@ -6895,29 +6972,47 @@ def clusterstestnew(request):
                 supervisor_number = mr_id_value[4:]
                 print("-------->>>>", today, supervisor_number)
                 try:
-                    locations = SupervsiorLocation.objects.filter(
-                        supervisor_number=supervisor_number,
-                        date=today
-                    ).values('geo_lat', 'geo_long', 'supervisor_number', 'date')
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT
+                            jsonb_agg(
+                                jsonb_build_object(
+                                'geo_lat',  p->>'lat',
+                                'geo_long', p->>'lng',
+                                'time',     p->>'time'
+                                )
+                            ) AS path,
+                            sl.supervisor_number,
+                            sl.date
+                            FROM supervsiorlocation sl
+                            CROSS JOIN LATERAL jsonb_array_elements(sl.meta->'path') AS p
+                            WHERE sl.supervisor_number = %s
+                            AND sl.date = %s
+                            GROUP BY sl.supervisor_number, sl.date
+                        """, [supervisor_number, today])
 
-                    supervisor_login_data = None
-                    if locations:
-                        supervisor_login_data = SupervisorLogin.objects.filter(
-                            supervisor_number=supervisor_number
-                        ).values('supervisor_name', 'ofc_division', 'ofc_subdivision').first()
+                        row = cursor.fetchone()
 
-                    print("location type", type(locations))
-                    location_list = list(locations)
+                    if not row:
+                        return Response([])
 
-                    # Add supervisor_login_data to each location in the list
+                    response_data = {
+                        "supervisor_number": row[1],
+                        "date": row[2],
+                        "path": json.loads(row[0]) if isinstance(row[0], str) else row[0]
+                    }
+
+                    supervisor_login_data = SupervisorLogin.objects.filter(
+                        supervisor_number=supervisor_number
+                    ).values(
+                        'supervisor_name', 'ofc_division', 'ofc_subdivision'
+                    ).first()
+
                     if supervisor_login_data:
-                        for location in location_list:
-                            location.update(supervisor_login_data)
-
-                    return Response(location_list)
-
+                        response_data.update(supervisor_login_data)
+                    return Response(response_data)
                 except Exception as e:
-                    print(f"Database query error: {e}")
+                    return Response({"error": str(e)}, status=500)
 
         clause += "WHERE "
         for i, (key, value) in enumerate(data.items()):
