@@ -6,7 +6,7 @@ Globals:
   Function:
     # Set default Memory and Timeout for all functions
     MemorySize: 512
-    Timeout: 30
+    Timeout: 600
 
 Resources:
   DjangoLambdaFunction:
