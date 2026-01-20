@@ -7163,175 +7163,296 @@ def clusterstestnew(request):
 #         return Response([])
 
 
-# Sanjeev
+#indra
 @api_view(["POST"])
 def newmonthdataa(request):
+    filters = request.data.get("filters", {}) or {}
+
+    # --- Determine month ---
     today = date.today()
-    this_month = today.strftime("%Y-%m")
-    year = this_month.split("-")[0]
-    month = this_month.split("-")[1]
-
-    new = []
-
-    def listfun(dict):
-        new.append(dict.copy())
-        return new
-
-    newdict = {}
-    clause = ""
-    filters = request.data.get("filters", None)
-    try:
-        clause += "WHERE "
-        if "month" not in filters:
-            clause += (
-                f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'"
-            )
-        else:
-            selected_month = filters["month"]
-            selected_year = selected_month.split("-")[0]
-            selected_month_num = selected_month.split("-")[1]
-            clause += (
-                f"extract(month from reading_date_db) = '{selected_month_num}' AND extract(year from reading_date_db) = '{selected_year}'"
-            )
-
-        clause += (
-            f" AND bl_agnc_name='{filters['bl_agnc_name']}'"
-            if "bl_agnc_name" in filters
-            else ""
-        )
-        clause += (
-            f" AND extract(day from reading_date_db) BETWEEN '{filters['startdate']}' AND '{filters['enddate']}'"
-            if "enddate" in filters and "startdate" in filters
-            else ""
-        )
-
-        clause += (
-            f" AND ofc_discom='{filters['ofc_discom']}'"
-            if "ofc_discom" in filters
-            else ""
-        )
-        clause += (
-            f" AND ofc_zone='{filters['ofc_zone']}'"
-            if "ofc_zone" in filters
-            else ""
-        )
-        clause += (
-            f" AND ofc_circle='{filters['ofc_circle']}'"
-            if "ofc_circle" in filters
-            else ""
-        )
-        clause += (
-            f" AND ofc_division='{filters['ofc_division']}'"
-            if "ofc_division" in filters
-            else ""
-        )
-        clause += (
-            f" AND ofc_subdivision='{filters['ofc_subdivision']}'"
-            if "ofc_subdivision" in filters
-            else ""
-        )
-    except:
-        pass
-
-    # Determine the table name based on the selected month
-    current_month = datetime.now().strftime("%Y-%m")
-    previous_month = (
-        datetime.now() - timedelta(days=datetime.now().day)).strftime("%Y-%m")
+    current_month = today.strftime("%Y-%m")
+    previous_month = (today - timedelta(days=today.day)).strftime("%Y-%m")
     selected_month = filters.get("month", current_month)
-    tablename = "readingmaster" if selected_month in {
-        current_month, previous_month} else "prevmonthsdata"
 
-    cursor = connection.cursor()
+    year, month = map(int, selected_month.split("-"))
+    start_date = date(year, month, 1)
+    if month == 12:
+        end_date = date(year + 1, 1, 1)
+    else:
+        end_date = date(year, month + 1, 1)
+
+    # --- Table selection (unchanged logic) ---
+    tablename = (
+        "readingmaster"
+        if selected_month in {current_month, previous_month}
+        else "prevmonthsdata"
+    )
+
+    where_clauses = [
+        "r.reading_date_db >= %s",
+        "r.reading_date_db < %s"
+    ]
+    params = [start_date, end_date]
+
+    # Optional filters (unchanged behavior)
+    mapping = {
+        "bl_agnc_name": "r.bl_agnc_name",
+        "ofc_discom": "r.ofc_discom",
+        "ofc_zone": "r.ofc_zone",
+        "ofc_circle": "r.ofc_circle",
+        "ofc_division": "r.ofc_division",
+        "ofc_subdivision": "r.ofc_subdivision",
+    }
+
+    for key, column in mapping.items():
+        if key in filters:
+            where_clauses.append(f"{column} = %s")
+            params.append(filters[key])
+
+    where_sql = " WHERE " + " AND ".join(where_clauses)
+
     query = f"""
-       SELECT r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision,
-               COUNT(*) AS billed_consumers,
-               COUNT(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END) AS ok_readings,
-               COUNT(CASE WHEN rdng_ocr_status='Passed' THEN 1 END) AS OCRwithoutException,
-               COUNT(CASE WHEN rdng_ocr_status='Failed' THEN 1 END) AS OCRwithException,
-               COUNT(CASE WHEN prsnt_mtr_status='Meter Defective' THEN 1 END) AS MeterDefective,
-               COUNT(CASE WHEN prsnt_mtr_status='Door Locked' THEN 1 END) AS DoorLocked,
-               r.bl_agnc_name,
-               COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END)
-               - (COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END)
-               + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) AS diff,
-               SUM(CASE WHEN rdng_ocr_status = 'Failed' and qc_rmrk='MR Fault' THEN 1 ELSE 0 END) AS mrFault,
-               SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS imageBlur,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Incorrect Reading' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS incorrectReading,
-            SUM(CASE
-        WHEN (prsnt_rdng_ocr_excep = 'Meter Dirty' and rdng_ocr_status='Failed')
-             OR (rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '')
-        THEN 1
-        ELSE 0
-    END) AS meterDirty,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS noExcepFound,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image'  AND rdng_ocr_status = 'Failed' THEN 1 ELSE 0 END) AS spoofedImage,
-            SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS invalidImage
+        SELECT
+            r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle,
+            r.ofc_division, r.ofc_subdivision,
+            COUNT(*) AS billed_consumers,
+            COUNT(*) FILTER (WHERE prsnt_mtr_status='Ok') AS ok_readings,
+            COUNT(*) FILTER (WHERE rdng_ocr_status='Passed') AS OCRwithoutException,
+            COUNT(*) FILTER (WHERE rdng_ocr_status='Failed') AS OCRwithException,
+            COUNT(*) FILTER (WHERE prsnt_mtr_status='Meter Defective') AS MeterDefective,
+            COUNT(*) FILTER (WHERE prsnt_mtr_status='Door Locked') AS DoorLocked,
+            r.bl_agnc_name,
+            COUNT(*) FILTER (WHERE rdng_ocr_status='Failed' AND qc_rmrk='MR Fault') AS mrFault,
+            COUNT(*) FILTER (WHERE prsnt_rdng_ocr_excep='Image blur' AND rdng_ocr_status='Failed') AS imageBlur,
+            COUNT(*) FILTER (WHERE prsnt_rdng_ocr_excep='Incorrect Reading' AND rdng_ocr_status='Failed') AS incorrectReading,
+            COUNT(*) FILTER (
+                WHERE rdng_ocr_status='Failed'
+                AND (prsnt_rdng_ocr_excep='Meter Dirty' OR prsnt_rdng_ocr_excep='')
+            ) AS meterDirty,
+            COUNT(*) FILTER (WHERE prsnt_rdng_ocr_excep='No Exception Found' AND rdng_ocr_status='Failed') AS noExcepFound,
+            COUNT(*) FILTER (WHERE prsnt_rdng_ocr_excep='Spoofed Image' AND rdng_ocr_status='Failed') AS spoofedImage,
+            COUNT(*) FILTER (WHERE prsnt_rdng_ocr_excep='Invalid' AND rdng_ocr_status='Failed') AS invalidImage
         FROM {tablename} r
-        {clause}
-        GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name;
+        {where_sql}
+        GROUP BY
+            r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle,
+            r.ofc_division, r.ofc_subdivision, r.bl_agnc_name;
     """
 
-    print("QUERY------>", query)
-    cursor.execute(query)
+    cursor = connection.cursor()
+    print(
+        "\nFINAL SQL QUERY:\n",
+        cursor.mogrify(query, params).decode("utf-8")
+    )
+    cursor.execute(query, params)
     results = cursor.fetchall()
+    cursor.close()
 
-    try:
-        for row in results:
-            total = row[6]
-            okreadings = row[7]
-            ocrreadings = row[8]
-            ocrwithexcep = row[9]
-            meterdefective = row[10]
-            doorlocked = row[11]
+    response = []
+    for row in results:
+        total = row[6]
+        ok = row[7]
 
-            # Percentage
-            okreadpercent = round((okreadings / total)
-                                  * 100, 2) if total else 0
-            ocrreadingpercent = round(
-                (ocrreadings / okreadings) * 100, 2) if okreadings else 0
-            ocrwithexceppercent = round(
-                (ocrwithexcep / okreadings) * 100, 2) if okreadings else 0
-            meterdefectivepercent = round(
-                (meterdefective / total) * 100, 2) if total else 0
-            doorlockedpercent = round(
-                (doorlocked / total) * 100, 2) if total else 0
+        response.append({
+            "mrid": row[0],
+            "ofc_discom": row[1],
+            "ofc_zone": row[2],
+            "ofc_circle": row[3],
+            "ofc_division": row[4],
+            "ofc_subdivision": row[5],
+            "billed_consumers": total,
+            "meterdefective": row[10],
+            "doorlocked": row[11],
+            "agency": row[12],
+            "OKreadings": ok,
+            "OCRReadings": row[8] + row[13],
+            "OCRwithException": row[9],
+            "OKreadingspercent": round((ok / total) * 100, 2) if total else 0,
+            "OCRReadingspercent": round((row[8] / ok) * 100, 2) if ok else 0,
+            "OCRwithExceptionpercent": round((row[9] / ok) * 100, 2) if ok else 0,
+            "MeterDefectivePercent": round((row[10] / total) * 100, 2) if total else 0,
+            "DoorLockedOercent": round((row[11] / total) * 100, 2) if total else 0,
+            "mrFault": row[13],
+            "imageBlur": row[14],
+            "incorrectReading": row[15],
+            "meterDirty": row[16],
+            "noExcepFound": row[17],
+            "spoofedImage": row[18],
+            "invalidImage": row[19],
+        })
 
-            # Add to dictionary
-            newdict["mrid"] = row[0]
-            newdict["ofc_discom"] = row[1]
-            newdict["ofc_zone"] = row[2]
-            newdict["ofc_circle"] = row[3]
-            newdict["ofc_division"] = row[4]
-            newdict["ofc_subdivision"] = row[5]
-            newdict["billed_consumers"] = row[6]
-            newdict["meterdefective"] = row[10]
-            newdict["doorlocked"] = row[11]
-            newdict["agency"] = row[12]
-            newdict["OKreadings"] = okreadings
-            newdict["OCRReadings"] = ocrreadings + row[13]
-            newdict["OCRwithException"] = ocrwithexcep
-            newdict["OKreadingspercent"] = okreadpercent
-            newdict["OCRReadingspercent"] = ocrreadingpercent
-            newdict["OCRwithExceptionpercent"] = ocrwithexceppercent
-            newdict["MeterDefectivePercent"] = meterdefectivepercent
-            newdict["DoorLockedOercent"] = doorlockedpercent
-            newdict["mrFault"] = row[14]
-            newdict["imageBlur"] = row[15]
-            newdict["incorrectReading"] = row[16]
-            newdict["meterDirty"] = row[17]
-            newdict["noExcepFound"] = row[18]
-            newdict["spoofedImage"] = row[19]
-            newdict["invalidImage"] = row[20]
-            # newdict["blanks"] = row[21]
+    return Response(response)
 
-            # Add to list
-            newdata = listfun(newdict)
 
-        return Response(newdata)
+# # Sanjeev
+# @api_view(["POST"])
+# def newmonthdataa(request):
+#     today = date.today()
+#     this_month = today.strftime("%Y-%m")
+#     year = this_month.split("-")[0]
+#     month = this_month.split("-")[1]
 
-    except Exception as e:
-        print(e)
-        return Response([])
+#     new = []
+
+#     def listfun(dict):
+#         new.append(dict.copy())
+#         return new
+
+#     newdict = {}
+#     clause = ""
+#     filters = request.data.get("filters", None)
+#     try:
+#         clause += "WHERE "
+#         if "month" not in filters:
+#             clause += (
+#                 f"extract(month from reading_date_db) = '{month}' AND extract(year from reading_date_db) = '{year}'"
+#             )
+#         else:
+#             selected_month = filters["month"]
+#             selected_year = selected_month.split("-")[0]
+#             selected_month_num = selected_month.split("-")[1]
+#             clause += (
+#                 f"extract(month from reading_date_db) = '{selected_month_num}' AND extract(year from reading_date_db) = '{selected_year}'"
+#             )
+
+#         clause += (
+#             f" AND bl_agnc_name='{filters['bl_agnc_name']}'"
+#             if "bl_agnc_name" in filters
+#             else ""
+#         )
+#         clause += (
+#             f" AND extract(day from reading_date_db) BETWEEN '{filters['startdate']}' AND '{filters['enddate']}'"
+#             if "enddate" in filters and "startdate" in filters
+#             else ""
+#         )
+
+#         clause += (
+#             f" AND ofc_discom='{filters['ofc_discom']}'"
+#             if "ofc_discom" in filters
+#             else ""
+#         )
+#         clause += (
+#             f" AND ofc_zone='{filters['ofc_zone']}'"
+#             if "ofc_zone" in filters
+#             else ""
+#         )
+#         clause += (
+#             f" AND ofc_circle='{filters['ofc_circle']}'"
+#             if "ofc_circle" in filters
+#             else ""
+#         )
+#         clause += (
+#             f" AND ofc_division='{filters['ofc_division']}'"
+#             if "ofc_division" in filters
+#             else ""
+#         )
+#         clause += (
+#             f" AND ofc_subdivision='{filters['ofc_subdivision']}'"
+#             if "ofc_subdivision" in filters
+#             else ""
+#         )
+#     except:
+#         pass
+
+#     # Determine the table name based on the selected month
+#     current_month = datetime.now().strftime("%Y-%m")
+#     previous_month = (
+#         datetime.now() - timedelta(days=datetime.now().day)).strftime("%Y-%m")
+#     selected_month = filters.get("month", current_month)
+#     tablename = "readingmaster" if selected_month in {
+#         current_month, previous_month} else "prevmonthsdata"
+
+#     cursor = connection.cursor()
+#     query = f"""
+#        SELECT r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision,
+#                COUNT(*) AS billed_consumers,
+#                COUNT(CASE WHEN prsnt_mtr_status='Ok' THEN 1 END) AS ok_readings,
+#                COUNT(CASE WHEN rdng_ocr_status='Passed' THEN 1 END) AS OCRwithoutException,
+#                COUNT(CASE WHEN rdng_ocr_status='Failed' THEN 1 END) AS OCRwithException,
+#                COUNT(CASE WHEN prsnt_mtr_status='Meter Defective' THEN 1 END) AS MeterDefective,
+#                COUNT(CASE WHEN prsnt_mtr_status='Door Locked' THEN 1 END) AS DoorLocked,
+#                r.bl_agnc_name,
+#                COUNT(CASE WHEN prsnt_mtr_status = 'Ok' THEN 1 END)
+#                - (COUNT(CASE WHEN rdng_ocr_status = 'Passed' THEN 1 END)
+#                + COUNT(CASE WHEN rdng_ocr_status = 'Failed' THEN 1 END)) AS diff,
+#                SUM(CASE WHEN rdng_ocr_status = 'Failed' and qc_rmrk='MR Fault' THEN 1 ELSE 0 END) AS mrFault,
+#                SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Image blur' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS imageBlur,
+#             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Incorrect Reading' and rdng_ocr_status='Failed' THEN 1 ELSE 0 END) AS incorrectReading,
+#             SUM(CASE
+#         WHEN (prsnt_rdng_ocr_excep = 'Meter Dirty' and rdng_ocr_status='Failed')
+#              OR (rdng_ocr_status = 'Failed' AND prsnt_rdng_ocr_excep = '')
+#         THEN 1
+#         ELSE 0
+#     END) AS meterDirty,
+#             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'No Exception Found'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS noExcepFound,
+#             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Spoofed Image'  AND rdng_ocr_status = 'Failed' THEN 1 ELSE 0 END) AS spoofedImage,
+#             SUM(CASE WHEN prsnt_rdng_ocr_excep = 'Invalid'  AND rdng_ocr_status = 'Failed'  THEN 1 ELSE 0 END) AS invalidImage
+#         FROM {tablename} r
+#         {clause}
+#         GROUP BY r.mr_id, r.ofc_discom, r.ofc_zone, r.ofc_circle, r.ofc_division, r.ofc_subdivision, r.bl_agnc_name;
+#     """
+
+#     print("QUERY------>", query)
+#     cursor.execute(query)
+#     results = cursor.fetchall()
+
+#     try:
+#         for row in results:
+#             total = row[6]
+#             okreadings = row[7]
+#             ocrreadings = row[8]
+#             ocrwithexcep = row[9]
+#             meterdefective = row[10]
+#             doorlocked = row[11]
+
+#             # Percentage
+#             okreadpercent = round((okreadings / total)
+#                                   * 100, 2) if total else 0
+#             ocrreadingpercent = round(
+#                 (ocrreadings / okreadings) * 100, 2) if okreadings else 0
+#             ocrwithexceppercent = round(
+#                 (ocrwithexcep / okreadings) * 100, 2) if okreadings else 0
+#             meterdefectivepercent = round(
+#                 (meterdefective / total) * 100, 2) if total else 0
+#             doorlockedpercent = round(
+#                 (doorlocked / total) * 100, 2) if total else 0
+
+#             # Add to dictionary
+#             newdict["mrid"] = row[0]
+#             newdict["ofc_discom"] = row[1]
+#             newdict["ofc_zone"] = row[2]
+#             newdict["ofc_circle"] = row[3]
+#             newdict["ofc_division"] = row[4]
+#             newdict["ofc_subdivision"] = row[5]
+#             newdict["billed_consumers"] = row[6]
+#             newdict["meterdefective"] = row[10]
+#             newdict["doorlocked"] = row[11]
+#             newdict["agency"] = row[12]
+#             newdict["OKreadings"] = okreadings
+#             newdict["OCRReadings"] = ocrreadings + row[13]
+#             newdict["OCRwithException"] = ocrwithexcep
+#             newdict["OKreadingspercent"] = okreadpercent
+#             newdict["OCRReadingspercent"] = ocrreadingpercent
+#             newdict["OCRwithExceptionpercent"] = ocrwithexceppercent
+#             newdict["MeterDefectivePercent"] = meterdefectivepercent
+#             newdict["DoorLockedOercent"] = doorlockedpercent
+#             newdict["mrFault"] = row[14]
+#             newdict["imageBlur"] = row[15]
+#             newdict["incorrectReading"] = row[16]
+#             newdict["meterDirty"] = row[17]
+#             newdict["noExcepFound"] = row[18]
+#             newdict["spoofedImage"] = row[19]
+#             newdict["invalidImage"] = row[20]
+#             # newdict["blanks"] = row[21]
+
+#             # Add to list
+#             newdata = listfun(newdict)
+
+#         return Response(newdata)
+
+#     except Exception as e:
+#         print(e)
+#         return Response([])
 
 
 @api_view(["POST"])
