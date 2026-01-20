@@ -2505,7 +2505,9 @@ def reading_details_by_mrid(request):
                geo_long AS geo_long,
                rdng_img AS reading_image,
                prsnt_mtr_status AS meter_status,
-               rdng_ocr_status AS ocr_status
+               rdng_ocr_status AS ocr_status,
+               prsnt_ocr_rdng AS ocr_reading,
+               prsnt_rdng AS manual_reading
         FROM readingmaster
         WHERE {where_clause}
         ORDER BY reading_date_db DESC
